@@ -6,12 +6,50 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 const STRICT_MUL = [1.4, 1, 0.75]; // suave, normal, estricto
 
+const GRADE_TOL = [1, 0.93, 0.86, 0.8, 0.74, 0.68]; // cada grado afina el margen
+
 export function tolerance(def, opts = {}) {
   const base = def.tol ?? 50;
-  return Math.round(base * STRICT_MUL[opts.strict ?? 1] + (opts.ease ?? 0) * 15);
+  const g = Math.max(0, Math.min(5, opts.grade ?? 0));
+  return Math.max(25, Math.round(base * STRICT_MUL[opts.strict ?? 1] * GRADE_TOL[g] + (opts.ease ?? 0) * 15));
 }
 
-export function buildPlan(def, profile, opts = {}) {
+/**
+ * Cada grado vuelve el mismo ejercicio un poco más exigente:
+ * más rápido, más repeticiones (llega más alto), notas y screams más largos, más aire.
+ */
+export function withGrade(def, grade = 0) {
+  const g = Math.max(0, Math.min(5, grade));
+  if (!g) return def;
+  const d = { ...def };
+  switch (def.kind) {
+    case 'pattern':
+      d.bpm = (def.bpm ?? 60) * (1 + 0.04 * g);
+      if ((def.step ?? 1) !== 0 && (def.reps ?? 3) > 1) d.reps = (def.reps ?? 3) + Math.floor(g / 2);
+      break;
+    case 'sustain':
+      d.secs = (def.secs ?? 4) * (1 + 0.15 * g);
+      break;
+    case 'slide':
+      d.to = (def.to ?? 0.85) + 0.03 * g;
+      break;
+    case 'breath':
+      d.target = Math.round((def.target ?? 15) * (1 + 0.2 * g));
+      break;
+    case 'harsh':
+    case 'trans':
+      d.windows = def.windows.map(([e, secs, label]) => [e, e === 'harsh' && secs >= 1.5 ? +(secs * (1 + 0.12 * g)).toFixed(1) : secs, label]);
+      break;
+    case 'rhythm':
+      d.bpm = (def.bpm ?? 100) * (1 + 0.04 * g);
+      break;
+    default:
+  }
+  return d;
+}
+
+export function buildPlan(rawDef, profile, opts = {}) {
+  const def = withGrade(rawDef, opts.grade);
   switch (def.kind) {
     case 'pattern':
     case 'sustain':

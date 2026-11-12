@@ -1,8 +1,11 @@
 // Arma la sesión del día sin que tengas que decidir nada:
-// calentar → repasar lo más débil → lección nueva → algo divertido → enfriar.
+// calentar → repasos que tocan hoy → lección en curso o nueva → gimnasio / riff → enfriar.
 
-import { LESSONS, WARMUPS, COOLDOWNS, isScored, isHarsh } from '../content/curriculum.js';
-import { pendingLessons, lessonStatus, stepStatus, harshBlocked, lessonAllowed, dayKey } from './progress.js';
+import { LESSONS, WARMUPS, COOLDOWNS, isScored, isHarsh, stepById } from '../content/curriculum.js';
+import { RIFF_ID } from './riffs.js';
+import {
+  pendingLessons, lessonStatus, stepStatus, harshBlocked, lessonAllowed, dayKey, canStart, dueSteps, gymAvailable,
+} from './progress.js';
 
 const rotate = (list, n) => list[((n % list.length) + list.length) % list.length];
 
@@ -21,8 +24,10 @@ function remaining(state, lesson) {
 }
 
 /**
- * mode: 'daily' (≈7 min) | 'quick' (≈2 min)
- * Devuelve { steps, lesson, lessons, mode, blocked }.
+ * mode: 'daily' (≈8 min) | 'quick' (≈2 min)
+ * Devuelve { steps, lesson, lessons, mode, blocked, reviews, waiting }.
+ *  - reviews: cuántos repasos entraron
+ *  - waiting: lección que ya está desbloqueada pero se abre mañana (tope diario)
  */
 export function buildSession(state, mode = 'daily', now = Date.now()) {
   const seed = daySeed(now) + state.sessions;
@@ -38,57 +43,85 @@ export function buildSession(state, mode = 'daily', now = Date.now()) {
     }
     return false;
   };
+  const quick = mode === 'quick';
 
   // 1. Calentamiento (siempre): primero una sirena, que no exige oído fino.
   add(rotate(WARMUPS.filter((w) => w.kind === 'slide'), seed));
-  if (mode === 'daily') add(rotate(WARMUPS.filter((w) => w.kind !== 'slide'), seed));
+  if (!quick) add(rotate(WARMUPS.filter((w) => w.kind !== 'slide'), seed));
 
-  // 2. Lecciones pendientes. Si la garganta descansa, las de guturales esperan.
+  // 2. Repasos que tocan hoy, lo más atrasado primero.
+  const due = dueSteps(state, now).filter(ok);
+  let reviews = 0;
+  for (const s of due.slice(0, quick ? 1 : 3)) if (add(s)) reviews++;
+
+  // 3. Lecciones: primero lo que ya está en curso; lo nuevo, solo si hoy todavía cabe.
   const pending = pendingLessons(state).filter((l) => !(blocked && l.track === 'harsh'));
-  const lesson = pending[0] ?? null;
-
-  // 3. Repaso: el ejercicio ya practicado con peor puntaje o más olvidado
-  const inSession = new Set(pending.slice(0, 2).map((l) => l.id));
-  const practiced = LESSONS.filter((l) => lessonAllowed(state, l))
-    .flatMap((l) => l.steps)
-    .filter((s) => isScored(s) && stepStatus(state, s).plays > 0 && !inSession.has(s.lesson) && ok(s));
-  const urgency = (s) => {
-    const r = state.ex[s.id];
-    return r.best - Math.min(30, ((now - r.ts) / 86400000) * 4); // menor = más urgente
-  };
-  const review = [...practiced].sort((a, b) => urgency(a) - urgency(b));
-
-  if (mode === 'quick') {
-    // Solo hasta el primer ejercicio pendiente de la lección (con sus tarjetas previas)
-    const rest = lesson ? remaining(state, lesson) : [];
-    const cut = rest.findIndex((s) => s.kind !== 'card');
-    const before = steps.length;
-    rest.slice(0, cut + 1).forEach(add);
-    if (steps.length === before) add(review[0]);
-    return { steps, lesson, lessons: lesson ? [lesson] : [], mode, blocked };
-  }
-
-  add(review[0]);
   const lessons = [];
-  if (lesson) {
-    remaining(state, lesson).forEach(add);
-    lessons.push(lesson);
-    // Si la lección de hoy es corta, entra también la siguiente.
-    if (pending[1] && estimateMinutes(steps) < 5) {
-      remaining(state, pending[1]).forEach(add);
-      lessons.push(pending[1]);
+  let waiting = null;
+  for (const l of pending) {
+    if (!canStart(state, l, now)) {
+      waiting ??= l;
+      continue;
     }
+    const isNew = !lessonStatus(state, l).started;
+    const rest = remaining(state, l);
+    if (quick) {
+      if (reviews) break; // en 2 minutos: un repaso, o un ejercicio de la lección
+      const cut = rest.findIndex((s) => s.kind !== 'card');
+      rest.slice(0, cut + 1).forEach(add);
+      lessons.push(l);
+      break;
+    }
+    if (lessons.length && estimateMinutes(steps) >= (isNew ? 5 : 8)) break;
+    rest.forEach(add);
+    lessons.push(l);
+    // Cuenta lo que esta sesión empezaría hoy, para no pasarse del tope
+    if (isNew) state = { ...state, started: { ...state.started, [l.id]: dayKey(now) } };
+    if (lessons.length >= 2) break;
+  }
+  if (quick) {
+    if (steps.length < 2) add(rotate(gymAvailable(state), seed));
+    return { steps, lesson: lessons[0] ?? null, lessons, mode, blocked, reviews, waiting };
   }
 
-  // 4. Algo divertido que ya dominas (estilo, guturales o ritmo)
-  const fun = practiced.filter((s) => ['style', 'harsh', 'rhythm'].includes(s.skill) && stepStatus(state, s).done);
-  if (fun.length) add(rotate(fun, seed));
-  else if (!lesson) add(review[1]);
+  // 4. Gimnasio: si hoy no hubo material nuevo suficiente, entra un ejercicio que no conoces.
+  if (estimateMinutes(steps) < 7) {
+    const gym = gymAvailable(state).filter(ok);
+    add(gym.find((g) => !state.ex[g.id]) ?? rotate(gym, seed));
+  }
 
-  // 5. Enfriamiento
+  // 5. Riff del día: una frase nueva cada día, cuando ya conoces la mecánica.
+  if (estimateMinutes(steps) < 8 && (state.ex['tono-2:1']?.plays ?? 0) > 0) add(stepById(RIFF_ID));
+
+  // 6. Algo divertido que ya dominas (estilo, guturales o ritmo)
+  if (estimateMinutes(steps) < 8) {
+    const fun = LESSONS.filter((l) => lessonAllowed(state, l))
+      .flatMap((l) => l.steps)
+      .filter((s) => isScored(s) && ['style', 'harsh', 'rhythm'].includes(s.skill) && stepStatus(state, s).done);
+    if (fun.length) add(rotate(fun, seed));
+  }
+
+  // 7. Enfriamiento
   add(rotate(COOLDOWNS, seed));
 
-  return { steps, lesson, lessons, mode, blocked };
+  return { steps, lesson: lessons[0] ?? null, lessons, mode, blocked, reviews, waiting };
+}
+
+/** Solo repasos: para cuando quieres más sin adelantar material nuevo. */
+export function reviewSession(state, now = Date.now()) {
+  const blocked = harshBlocked(state, now);
+  const seed = daySeed(now) + state.sessions;
+  const due = dueSteps(state, now).filter((s) => !(blocked && isHarsh(s)));
+  let pool = due.slice(0, 6);
+  if (!pool.length) {
+    // Nada pendiente: práctica extra de lo menos asentado
+    pool = [...LESSONS.filter((l) => lessonAllowed(state, l)).flatMap((l) => l.steps), ...gymAvailable(state)]
+      .filter((s) => isScored(s) && stepStatus(state, s).plays > 0 && !(blocked && isHarsh(s)))
+      .sort((a, b) => stepStatus(state, a).grade - stepStatus(state, b).grade || state.ex[a.id].ts - state.ex[b.id].ts)
+      .slice(0, 4);
+  }
+  const steps = [rotate(WARMUPS.filter((w) => w.kind === 'slide'), seed), ...pool, rotate(COOLDOWNS, seed)];
+  return { steps, lesson: null, lessons: [], mode: 'review', blocked, reviews: due.length ? pool.length : 0, waiting: null };
 }
 
 /** Sesión para practicar una lección concreta desde la Ruta. */
@@ -98,7 +131,12 @@ export function lessonSession(state, lesson, now = Date.now()) {
   const needsWarm = lesson.steps.some((s) => isHarsh(s) || s.dyn === 'loud');
   if (needsWarm) steps.push(rotate(WARMUPS.filter((w) => w.kind === 'slide'), daySeed(now)));
   for (const s of lesson.steps) if (!(blocked && isHarsh(s))) steps.push(s);
-  return { steps, lesson, lessons: [lesson], mode: 'lesson', blocked };
+  return { steps, lesson, lessons: [lesson], mode: 'lesson', blocked, reviews: 0, waiting: null };
+}
+
+/** Un solo ejercicio (desde el gimnasio o la lista de repasos). */
+export function singleSession(step) {
+  return { steps: [step], lesson: null, lessons: [], mode: 'single', blocked: null, reviews: 0, waiting: null };
 }
 
 /** Duración estimada en minutos (para mostrar en el botón). */

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPlan } from '../js/coach/plan.js';
 import { scoreTake, detectOnsets } from '../js/coach/scoring.js';
-import { LESSONS, WARMUPS, COOLDOWNS, STAGES, stepById, isScored } from '../js/content/curriculum.js';
+import { LESSONS, WARMUPS, COOLDOWNS, GYM, STAGES, stepById, isScored } from '../js/content/curriculum.js';
+import { riffOfDay } from '../js/coach/riffs.js';
 import { makeFrames, singPlan } from './helpers.js';
 
 const profile = { low: 45, high: 64, refDb: -20 };
@@ -10,8 +11,8 @@ const five = stepById('tono-2:1');
 
 test('todos los ejercicios generan un plan válido dentro del rango', () => {
   for (const prof of [profile, { low: 52, high: 76 }, { low: 40, high: 52 }]) {
-    for (const s of [...LESSONS.flatMap((l) => l.steps), ...WARMUPS, ...COOLDOWNS]) {
-      const plan = buildPlan(s, prof, {});
+    for (const s of [...LESSONS.flatMap((l) => l.steps), ...WARMUPS, ...COOLDOWNS, ...GYM, riffOfDay(20511)]) for (const grade of [0, 2, 5]) {
+      const plan = buildPlan(s, prof, { grade });
       if (s.kind === 'card') continue;
       assert.ok(plan.dur > 0 && plan.dur < 120, `${s.id}: duración ${plan.dur}`);
       if (plan.view === 'pitch') {
@@ -33,6 +34,23 @@ test('cada lección pertenece a una etapa y tiene al menos un ejercicio califica
     assert.ok(ids.has(l.stage), l.id);
     assert.ok(l.steps.some(isScored), l.id);
   }
+});
+
+test('cada grado exige más: margen más fino, más rápido, más largo', () => {
+  const g0 = buildPlan(five, profile, { grade: 0 });
+  const g4 = buildPlan(five, profile, { grade: 4 });
+  assert.ok(g4.tol < g0.tol);
+  assert.ok(g4.bpm > g0.bpm);
+  assert.ok(g4.segs.length >= g0.segs.length);
+  assert.ok(buildPlan(stepById('aire-1:3'), profile, { grade: 5 }).target >= 24);
+  const h0 = buildPlan(stepById('scream-1:2'), profile, { grade: 0 });
+  const h5 = buildPlan(stepById('scream-1:2'), profile, { grade: 5 });
+  assert.ok(h5.dur > h0.dur);
+  // Lo que canta bien en grado 0 con 45 cents de error ya no alcanza en grado 5
+  const e0 = scoreTake(g0, singPlan(g0, () => -45)).score;
+  const g5 = buildPlan(five, profile, { grade: 5 });
+  const e5 = scoreTake(g5, singPlan(g5, () => -45)).score;
+  assert.ok(e5 < e0 - 15, `${e0} vs ${e5}`);
 });
 
 test('cantar perfecto da 3 estrellas', () => {

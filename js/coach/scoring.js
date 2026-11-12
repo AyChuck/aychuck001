@@ -22,7 +22,7 @@ const pct = (a, p) => {
   return s[clamp(Math.round((s.length - 1) * p), 0, s.length - 1)];
 };
 
-export const starsFor = (score) => (score >= 90 ? 3 : score >= 75 ? 2 : score >= 55 ? 1 : 0);
+export const starsFor = (score) => (score >= 90 ? 3 : score >= 75 ? 2 : score >= 60 ? 1 : 0);
 
 /**
  * Puntaje suave por cuadro: 1 en la mitad central de la tolerancia, baja hasta 0.85

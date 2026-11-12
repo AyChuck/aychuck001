@@ -2,6 +2,8 @@
 // Las notas van como [semitonos desde la raíz, pulsos, sílaba]: la app las
 // transporta al rango de cada persona.
 
+import { riffOfDay, RIFF_ID } from '../coach/riffs.js';
+
 const FIVE_MAJOR = [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]];
 const FIVE_MINOR = [[0, 1], [2, 1], [3, 1], [5, 1], [7, 1], [5, 1], [3, 1], [2, 1], [0, 2]];
 
@@ -323,20 +325,47 @@ const POOL = {
   ],
 };
 
+// Gimnasio: ejercicios que siguen cuando ya no hay lección nueva ese día.
+// Se abren por etapa ("needs") y tienen grados como todo lo demás.
+const GYM_RAW = [
+  { id: 'g-octava', needs: 's1', kind: 'pattern', skill: 'pitch', title: 'Escala menor completa', cue: 'Una octava entera, sube y baja con "na".', syl: 'na', notes: [[0, 0.5], [2, 0.5], [3, 0.5], [5, 0.5], [7, 0.5], [8, 0.5], [10, 0.5], [12, 1], [10, 0.5], [8, 0.5], [7, 0.5], [5, 0.5], [3, 0.5], [2, 0.5], [0, 2]], bpm: 88, reps: 3, step: 1, start: 0.1, backing: 'drone' },
+  { id: 'g-terceras', needs: 's1', kind: 'pattern', skill: 'pitch', title: 'Terceras menores', cue: 'Saltos de tercera encadenados, con "no".', syl: 'no', notes: [[0, 0.5], [3, 0.5], [2, 0.5], [5, 0.5], [3, 0.5], [7, 0.5], [5, 0.5], [8, 0.5], [7, 2]], bpm: 88, reps: 3, step: 1, start: 0.2, backing: 'drone' },
+  { id: 'g-penta', needs: 's1', kind: 'pattern', skill: 'pitch', title: 'Pentatónica menor', cue: 'La escala de los riffs. Con "ya".', syl: 'ya', notes: [[0, 0.5], [3, 0.5], [5, 0.5], [7, 0.5], [10, 0.5], [12, 1], [10, 0.5], [7, 0.5], [5, 0.5], [3, 0.5], [0, 2]], bpm: 92, reps: 3, step: 1, start: 0.1, backing: 'chug' },
+  { id: 'g-sosten', needs: 's1', kind: 'sustain', skill: 'breath', title: 'Nota de 8 segundos', cue: 'Una sola nota, quieta, hasta el final. Con "oh".', syl: 'oh', secs: 8, reps: 2, step: 2, start: 0.3,
+    how: ['Gasta el aire parejo. Si la línea baja al final, tomaste aire alto.'] },
+  { id: 'g-aire', needs: 's1', kind: 'breath', skill: 'breath', title: 'Hilo de 25 segundos', cue: 'Tu "sss" más largo y parejo.', target: 25 },
+  { id: 'g-armonica', needs: 's2', kind: 'pattern', skill: 'pitch', title: 'Menor armónica', cue: 'El sabor de los solos de metal. Con "na".', syl: 'na', notes: [[7, 0.5], [8, 0.5], [11, 0.5], [12, 1], [11, 0.5], [8, 0.5], [7, 1], [3, 0.5], [2, 0.5], [0, 2]], bpm: 88, reps: 3, step: 1, start: 0.2, backing: 'chug',
+    how: ['El salto raro entre la 2.ª y 3.ª nota es lo que la hace sonar "egipcia". Apunta despacio.'] },
+  { id: 'g-frigia', needs: 's2', kind: 'pattern', skill: 'pitch', title: 'Frigia de breakdown', cue: 'Medio tono arriba de la raíz: el sonido más oscuro.', syl: 'no', notes: [[0, 1], [1, 1], [0, 1], [-2, 1], [0, 1], [1, 0.5], [3, 0.5], [1, 1], [0, 2]], bpm: 84, reps: 3, step: 1, start: 0.25, backing: 'chug' },
+  { id: 'g-sextas', needs: 's2', kind: 'pattern', skill: 'range', title: 'Saltos de sexta', cue: 'Salto grande y aterriza limpio. Con "ya".', syl: 'ya', notes: [[0, 1], [8, 1.5], [7, 0.5], [0, 1], [9, 1.5], [7, 0.5], [0, 2]], bpm: 84, reps: 3, step: 1, start: 0.15 },
+  { id: 'g-suave-fuerte', needs: 's2', kind: 'pattern', skill: 'style', title: 'Frase susurrada', cue: 'Toda la frase con aire, sin que se caiga la nota.', syl: 'uh', dyn: 'soft', notes: [[0, 1], [3, 1], [5, 1.5], [3, 0.5], [2, 1], [0, 2]], bpm: 80, reps: 3, step: 1, start: 0.2, backing: 'ambient' },
+  { id: 'g-pulsos', needs: 's3', kind: 'harsh', skill: 'harsh', title: 'Pulsos de scream', cue: 'Un segundo sí, un segundo no. Seis veces.',
+    windows: [['harsh', 1, 'Scream'], ['rest', 1], ['harsh', 1, 'Scream'], ['rest', 1], ['harsh', 1, 'Scream'], ['rest', 1], ['harsh', 1, 'Scream'], ['rest', 1], ['harsh', 1, 'Scream'], ['rest', 1], ['harsh', 1, 'Scream']] },
+  { id: 'g-mix-alto', needs: 's3', kind: 'pattern', skill: 'range', title: 'Mix un paso más arriba', cue: '"Nei" burlón, hasta el borde de tu rango.', syl: 'nei', notes: [[0, 0.5], [4, 0.5], [7, 0.5], [12, 1.5], [7, 0.5], [4, 0.5], [0, 1.5]], bpm: 96, reps: 4, step: 1, start: 0.4, stretch: 1 },
+  { id: 'g-belt-largo', needs: 's3', kind: 'sustain', skill: 'power', title: 'Belt sostenido', cue: 'Fuerte, brillante y quieto. Con "eh".', syl: 'eh', dyn: 'loud', secs: 5, reps: 3, step: 1, start: 0.6 },
+  { id: 'g-ritmo-doble', needs: 's3', kind: 'rhythm', skill: 'rhythm', title: 'Breakdown con síncopa', cue: 'Golpes secos, respeta los silencios.', grid: 'x..x..x.|x.xx..x.', bpm: 100, reps: 2, texts: ['ha'] },
+  { id: 'g-run', needs: 's4', kind: 'pattern', skill: 'style', title: 'Run veloz', cue: 'Adorno rápido con "oh", limpio antes que rápido.', syl: 'oh', notes: [[12, 0.25], [10, 0.25], [7, 0.25], [5, 0.25], [3, 0.25], [5, 0.25], [7, 0.5], [3, 0.25], [2, 0.25], [0, 2]], bpm: 80, reps: 3, step: 1, start: 0.4, tol: 65 },
+  { id: 'g-trans-rapida', needs: 's4', kind: 'trans', skill: 'harsh', title: 'Cambios rápidos', cue: 'Limpio y scream, segundo y medio cada uno.',
+    windows: [['clean', 1.5, 'Limpio'], ['harsh', 1.5, 'Scream'], ['clean', 1.5, 'Limpio'], ['harsh', 1.5, 'Scream'], ['clean', 1.5, 'Limpio'], ['harsh', 1.5, 'Scream'], ['clean', 1.5, 'Limpio']] },
+  { id: 'g-vibrato', needs: 's4', kind: 'sustain', skill: 'style', title: 'Vibrato largo', cue: 'Siete segundos: recto al entrar, ondula al final.', syl: 'aaa', vibrato: true, secs: 7, reps: 2, step: 2, start: 0.35, tol: 80 },
+  { id: 'g-scream-largo', needs: 's4', kind: 'harsh', skill: 'harsh', title: 'Scream de 8 segundos', cue: 'Parejo, sin subir el volumen al final.', windows: [['harsh', 8, 'Sostén'], ['rest', 4], ['harsh', 8, 'Otra vez']] },
+];
+
 // Asigna ids estables a cada paso: "leccion:indice"
 export const LESSONS = RAW.map((l) => ({
   ...l,
   steps: l.steps.map((s, i) => ({ ...s, id: `${l.id}:${i}`, lesson: l.id })),
 }));
 
-export const WARMUPS = POOL.warmups;
-export const COOLDOWNS = POOL.cooldowns;
+export const WARMUPS = POOL.warmups.map((s) => ({ ...s, nograde: true }));
+export const COOLDOWNS = POOL.cooldowns.map((s) => ({ ...s, nograde: true }));
+export const GYM = GYM_RAW.map((s) => ({ ...s, gym: true }));
 
 const INDEX = new Map();
 for (const l of LESSONS) for (const s of l.steps) INDEX.set(s.id, s);
-for (const s of [...WARMUPS, ...COOLDOWNS]) INDEX.set(s.id, s);
+for (const s of [...WARMUPS, ...COOLDOWNS, ...GYM]) INDEX.set(s.id, s);
 
-export const stepById = (id) => INDEX.get(id);
+export const stepById = (id) => INDEX.get(id) ?? (id === RIFF_ID ? riffOfDay() : undefined);
 export const lessonById = (id) => LESSONS.find((l) => l.id === id);
 export const isScored = (step) => !['card', 'pacer'].includes(step.kind);
 export const isHarsh = (step) => step.kind === 'harsh' || step.kind === 'trans' || (step.kind === 'rhythm' && step.harsh);
