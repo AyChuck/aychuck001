@@ -1,0 +1,16 @@
+{
+  "name": "Catarsis",
+  "short_name": "Catarsis",
+  "description": "Entrenador vocal de metalcore: voz limpia, guturales y corrección en vivo.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0b10",
+  "theme_color": "#0c0b10",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

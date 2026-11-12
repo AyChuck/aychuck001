@@ -127,6 +127,7 @@ const RAW = [
   {
     id: 'estilo-1', stage: 's2', track: 'style', title: 'Verso susurrado',
     blurb: 'Voz con aire, pegado al micro',
+    listen: 'Bad Omens, "Just Pretend": los versos van casi hablados, pegados al micrófono.',
     steps: [
       card('Menos es más', 'Los versos de Sleep Token o Bad Omens casi se susurran: voz con aire, cerca del micrófono. Ese contraste hace que el coro explote después.', 'star'),
       { kind: 'pattern', skill: 'style', title: 'Verso: la marea', cue: 'Suave, con aire en la voz.', dyn: 'soft', backing: 'ambient', bpm: 84, reps: 2, step: 0, start: 0.2, tol: 60,
@@ -141,6 +142,7 @@ const RAW = [
   {
     id: 'registro-2', stage: 's3', track: 'range', title: 'Voz mixta',
     blurb: 'El truco de los coros altos',
+    listen: 'Sleep Token, "Chokehold": el coro sube sin sonar gritado.',
     steps: [
       card('Mix', 'La voz mixta suena potente sin gritar. El truco: sonido de niño burlón, "nei nei nei", nasal y brillante. Feo aquí, enorme en el coro.', 'ladder'),
       { kind: 'pattern', skill: 'range', title: 'Nei nei burlón', cue: 'Nasal y chillón, sin pena.', syl: 'nei', notes: [[0, 0.5], [4, 0.5], [7, 0.5], [12, 1.5], [7, 0.5], [4, 0.5], [0, 1.5]], bpm: 96, reps: 4, step: 1, start: 0.25,
@@ -151,6 +153,7 @@ const RAW = [
   {
     id: 'potencia-1', stage: 's3', track: 'power', title: 'Belting sin romperte',
     blurb: 'Llamar, no gritar',
+    listen: 'Architects, "Doomsday": un coro limpio, alto y sostenido.',
     steps: [
       card('Llamar, no gritar', 'Belting es como llamar a alguien que está lejos: "¡HEY!". La fuerza sale del abdomen y el sonido es brillante, no ancho ni gritado.', 'bolt'),
       { kind: 'pattern', skill: 'power', title: 'Llamadas', cue: 'Un "¡hey!" con energía en cada barra.', dyn: 'loud', notes: [[0, 1.5, 'Hey!']], bpm: 60, reps: 4, step: 1, start: 0.55,
@@ -173,6 +176,7 @@ const RAW = [
   {
     id: 'ritmo-1', stage: 's3', track: 'rhythm', title: 'Ritmo de breakdown',
     blurb: 'La voz también es percusión',
+    listen: 'Falling in Reverse, "Popular Monster": en el breakdown, cada sílaba cae con la batería.',
     steps: [
       card('El scream es percusión', 'En un breakdown la voz golpea junto con la batería. Cada sílaba es corta y seca. Primero con "¡ha!" limpio; la distorsión viene después.', 'pulse'),
       { kind: 'rhythm', skill: 'rhythm', title: 'Golpes a tiempo', cue: 'Un "¡ha!" seco en cada marca.', grid: 'x.x.x.x.', bpm: 90, reps: 2, texts: ['ha'] },
@@ -183,6 +187,7 @@ const RAW = [
   {
     id: 'estilo-2', stage: 's3', track: 'style', title: 'Coro que levanta',
     blurb: 'Arriba, abierto y con todo',
+    listen: 'Bad Omens, "Just Pretend": compara el volumen del verso con el del coro.',
     steps: [
       card('El coro va arriba', 'Los coros de metalcore viven en la parte alta de tu voz, con mix y vocales abiertas. Canta esta frase como si cerraras un festival.', 'star'),
       { kind: 'pattern', skill: 'style', title: 'Coro: brasas', cue: 'Con potencia y vocales abiertas.', dyn: 'loud', backing: 'chug', bpm: 92, reps: 2, step: 0, start: 0.7, tol: 60,
@@ -215,6 +220,7 @@ const RAW = [
   {
     id: 'trans-1', stage: 's4', track: 'harsh', title: 'Limpio, scream, limpio',
     blurb: 'Cambiar de voz sin tropezar',
+    listen: 'Sleep Token, "The Summoning": pasa de voz limpia a gutural y regresa en segundos.',
     steps: [
       card('El cambio', 'Lo difícil no es gritar: es volver a cantar limpio justo después. Entre uno y otro, suelta la garganta con una micro-respiración.', 'flame'),
       { kind: 'trans', skill: 'harsh', title: 'Ida y vuelta', cue: 'Alterna voz limpia y scream siguiendo la pantalla.',
@@ -233,6 +239,7 @@ const RAW = [
   {
     id: 'estilo-3', stage: 's4', track: 'style', title: 'Falsete y adornos',
     blurb: 'Ligero, flotando, con runs',
+    listen: 'Sleep Token, "The Summoning": falsete y adornos rápidos en la misma canción.',
     steps: [
       card('Falsete etéreo', 'El falsete es voz de cabeza con aire: ligero, casi flotando. Sleep Token lo usa con adornos rápidos (runs) sacados del R&B.', 'star'),
       { kind: 'pattern', skill: 'style', title: 'Cascada en falsete', cue: 'Baja ligero con "uu", sin peso.', syl: 'uu', dyn: 'soft', backing: 'ambient', notes: [[12, 0.5], [10, 0.5], [7, 0.5], [5, 0.5], [3, 0.5], [0, 1.5]], bpm: 80, reps: 3, step: -1, start: 0.9, tol: 60 },
@@ -245,6 +252,7 @@ const RAW = [
   {
     id: 'potencia-2', stage: 's5', track: 'power', title: 'Limpios con grit',
     blurb: 'Rasgar sin romper',
+    listen: 'Architects, "Animals": el coro es cantado, pero con rasguño encima.',
     steps: [
       card('Rasgar sin romper', 'El grit es un poco de fry encima de una nota cantada, como los coros rasposos de Architects. Primero la nota limpia; luego le sumas rasguño al 20 %.', 'bolt'),
       { kind: 'trans', skill: 'power', title: 'Limpia y con grit', cue: 'Misma nota: primero limpia, luego con rasguño.',
@@ -268,6 +276,7 @@ const RAW = [
   {
     id: 'ritmo-2', stage: 's5', track: 'rhythm', title: 'Flow rápido',
     blurb: 'Sílabas como metralleta',
+    listen: 'Falling in Reverse, "Watch the World Burn": versos rapeados a toda velocidad.',
     steps: [
       card('Sílabas como metralleta', 'Falling in Reverse mete versos casi rapeados. Aquí no importa la nota: importa que cada sílaba caiga exacta. Usa "ta-ka" con la lengua suelta.', 'pulse'),
       { kind: 'rhythm', skill: 'rhythm', title: 'Ta-ka', cue: 'Semicorcheas con "ta-ka".', div: 4, grid: 'xxxx..x.xxxx..x.', bpm: 76, reps: 2, texts: ['ta', 'ka'] },
@@ -290,6 +299,7 @@ const RAW = [
   {
     id: 'blegh', stage: 's5', track: 'harsh', title: 'El BLEGH',
     blurb: 'El remate de todo breakdown',
+    listen: 'Architects en vivo: Sam Carter volvió famoso este remate.',
     steps: [
       card('La firma', 'El "BLEGH" es el remate de un breakdown: un golpe corto, seco y con todo el aire. Se usa con moderación. Hoy sí toca.', 'flame'),
       { kind: 'harsh', skill: 'harsh', title: '¡BLEGH!', cue: 'Un golpe seco cada vez que aparezca.',

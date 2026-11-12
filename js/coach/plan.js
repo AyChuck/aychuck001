@@ -86,8 +86,10 @@ function pitchPlan(def, profile, opts) {
   }
 
   const all = notes.map((n) => n.midi);
+  const shortest = Math.min(...notes.filter((n) => n.seg === 'sing').map((n) => n.t1 - n.t0));
   return {
     view: 'pitch',
+    windowSecs: Math.max(4, Math.min(7, shortest * 12)),
     dur: t + 0.2,
     notes,
     segs,
@@ -210,7 +212,10 @@ function rhythmPlan(def, opts) {
     addBar('listen');
     addBar('sing');
   }
-  return { view: 'energy', dur: t + 0.5, windows, hits, beats, bpm, rhythm: true };
+  // Zoom según lo apretado del ritmo, para que los golpes no se encimen en pantalla
+  const gaps = hits.slice(1).map((h, i) => h.t - hits[i].t).filter((g) => g > 0.01);
+  const windowSecs = Math.max(3.5, Math.min(8, Math.min(...gaps) * 16));
+  return { view: 'energy', dur: t + 0.5, windows, hits, beats, bpm, rhythm: true, windowSecs };
 }
 
 function pacerPlan(def) {

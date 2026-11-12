@@ -24,10 +24,16 @@ const pct = (a, p) => {
 
 export const starsFor = (score) => (score >= 90 ? 3 : score >= 75 ? 2 : score >= 55 ? 1 : 0);
 
-/** Puntaje suave: 1 dentro de la tolerancia, cae a 0 a 2.5x la tolerancia. */
+/**
+ * Puntaje suave por cuadro: 1 en la mitad central de la tolerancia, baja hasta 0.85
+ * en el borde (para que afinar mejor sí se note) y cae a 0 a 2.5x la tolerancia.
+ */
 const soft = (errCents, tol) => {
   const e = Math.abs(errCents);
-  return e <= tol ? 1 : Math.max(0, 1 - (e - tol) / (1.5 * tol));
+  const half = tol / 2;
+  if (e <= half) return 1;
+  if (e <= tol) return 1 - 0.15 * ((e - half) / half);
+  return 0.85 * Math.max(0, 1 - (e - tol) / (1.5 * tol));
 };
 
 export function scoreTake(plan, frames, ctx = {}) {
@@ -179,7 +185,7 @@ function scorePitch(plan, frames, ctx) {
     }
   }
 
-  if (score >= 90) diag.push('great');
+  if (score >= 90 && !diag.length) diag.push('great');
   return { score, diag, stats, parts, notes: ns.map((x) => ({ score: x.score, t0: x.note.t0, t1: x.note.t1, midi: x.note.midi })) };
 }
 
@@ -242,7 +248,7 @@ function scoreSlide(plan, frames) {
     if (reachHi < 0.6) diag.push('shortHigh');
     if (reachLo < 0.6) diag.push('shortLow');
     if (cont < 0.6) diag.push('gaps');
-    if (score >= 90) diag.push('great');
+    if (score >= 90 && !diag.length) diag.push('great');
   }
   return {
     score,
@@ -282,7 +288,7 @@ function scoreBreath(plan, frames) {
   else {
     if (ratio < 0.7) diag.push('breathShort');
     if (steady < 0.5) diag.push('breathUnsteady');
-    if (score >= 90) diag.push('great');
+    if (score >= 90 && !diag.length) diag.push('great');
   }
   return {
     score,
@@ -370,7 +376,7 @@ function scoreWindows(plan, frames, ctx) {
     stats.centroids = cents.map((c) => (c ? Math.round(c) : null));
   }
 
-  if (score >= 90) diag.push('great');
+  if (score >= 90 && !diag.length) diag.push('great');
   return { score, diag, stats, parts };
 }
 
@@ -433,7 +439,7 @@ function scoreRhythm(plan, frames) {
     if (hitFrac < 0.7) diag.push('missedHits');
     if (timing < 0.6 && hitFrac >= 0.5) diag.push('timingLoose');
     if (extra > hits.length * 0.4) diag.push('extraHits');
-    if (score >= 90) diag.push('great');
+    if (score >= 90 && !diag.length) diag.push('great');
   }
   return {
     score,
@@ -473,11 +479,11 @@ const TIPS = {
   gaps: ['El sonido se corta', 'Mantén el aire fluyendo todo el recorrido. Si es trino de labios, sostén las mejillas con los dedos.'],
   breathShort: ['Se acabó el aire pronto', 'Inhala bajo: la panza y las costillas se abren, los hombros no suben. Luego suelta un hilo fino de aire, no un chorro.'],
   breathUnsteady: ['El aire salió disparejo', 'Imagina que empañas un vidrio a velocidad constante. El abdomen empuja lento y parejo.'],
-  tooClean: ['Sonó limpio, sin distorsión', 'No subas volumen. Vuelve al vocal fry (el "aaa" rasposo de recién despertado) y agrégale aire poco a poco.'],
+  tooClean: ['Sonó limpio, sin distorsión', 'No subas volumen. Vuelve al vocal fry (el "aaa" rasposo de recién despertado) y agrégale aire poco a poco. Si de verdad ibas con distorsión, sube la sensibilidad del detector en Ajustes.'],
   harshShort: ['La distorsión se corta', 'Mantén el aire constante desde el abdomen. Si la garganta aprieta para sostenerlo, para y vuelve al fry suave.'],
   tooLoud: ['Demasiado volumen', 'Un buen scream suena fuerte por el micrófono, no por empujar. Hazlo al volumen de tu voz hablada.'],
   fryLoud: ['El fry va más suave', 'El vocal fry es el sonido más bajito que puedes hacer. Si suena fuerte, estás apretando.'],
-  cleanDirty: ['La parte limpia salió sucia', 'Después del scream, suelta la garganta con un mini suspiro antes de cantar limpio.'],
+  cleanDirty: ['La parte limpia salió sucia', 'Después del scream, suelta la garganta con un mini suspiro antes de cantar limpio. Si tu voz limpia es muy aireada, baja la sensibilidad del detector en Ajustes.'],
   placeSame: ['Los tres colores sonaron parecido', 'Cambia la forma de la boca: "oh" con la boca alargada para graves, "ah" para medios, "ee" con sonrisa para agudos.'],
   missedHits: ['Faltaron golpes', 'Sigue el pulso con el cuerpo (cabeza o pie) y marca cada sílaba corta y seca: "¡ha!".'],
   timingLoose: ['El ritmo quedó suelto', 'Cuenta en voz baja "1 y 2 y" durante la guía. Los golpes cortos son más fáciles de clavar.'],

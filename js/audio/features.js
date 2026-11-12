@@ -101,9 +101,9 @@ export const gritFrom = (clarity) => Math.max(0, Math.min(1, (0.9 - clarity) / 0
  *  - hiss:    ruido agudo sin tono ("sss", aire)
  *  - harsh:   sonido con energía pero aperiódico (fry, false cord, scream)
  */
-export function classify(f, gate) {
+export function classify(f, gate, cleanMin = 0.8) {
   if (f.rms < gate) return 'silence';
-  if (f.clarity >= 0.8 && f.freq > 0) return 'clean';
+  if (f.clarity >= cleanMin && f.freq > 0) return 'clean';
   if (f.hfRatio > 0.45 && f.clarity < 0.6) return 'hiss';
   return 'harsh';
 }

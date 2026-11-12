@@ -27,7 +27,7 @@ export function defaultState() {
     v: 1,
     onboarded: false,
     profile: { goal: 'both', exp: 'new', low: 45, high: 64, firstLow: null, firstHigh: null, refDb: null, gate: 0.012, tested: false },
-    settings: { headphones: false, guide: true, strict: 1, sfx: true },
+    settings: { headphones: false, guide: true, strict: 1, sfx: true, grit: 1 },
     xp: 0,
     days: {},
     ex: {},
@@ -128,17 +128,23 @@ export function lessonAllowed(state, lesson) {
   return true;
 }
 
-/** Siguiente lección sin terminar dentro de las etapas desbloqueadas. */
-export function nextLesson(state) {
+/** Lecciones sin terminar dentro de las etapas desbloqueadas, en orden. */
+export function pendingLessons(state) {
+  const out = [];
   for (const st of STAGES) {
     if (!stageStatus(state, st.id).unlocked) break;
-    for (const l of LESSONS) {
-      if (l.stage !== st.id || !lessonAllowed(state, l)) continue;
-      if (!lessonStatus(state, l).done) return l;
+    const stage = LESSONS.filter((l) => l.stage === st.id && lessonAllowed(state, l));
+    // Con objetivo "guturales", dentro de cada etapa van primero aire, guturales y ritmo.
+    if (state.profile.goal === 'harsh') {
+      const first = (l) => (['breath', 'harsh', 'rhythm'].includes(l.track) ? 0 : 1);
+      stage.sort((a, b) => first(a) - first(b));
     }
+    for (const l of stage) if (!lessonStatus(state, l).done) out.push(l);
   }
-  return null;
+  return out;
 }
+
+export const nextLesson = (state) => pendingLessons(state)[0] ?? null;
 
 export function harshLeft(state, now = Date.now()) {
   const used = state.harsh.day === dayKey(now) ? state.harsh.secs : 0;
