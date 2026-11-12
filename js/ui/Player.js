@@ -8,7 +8,7 @@ import { buildPlan } from '../coach/plan.js';
 import { scoreTake } from '../coach/scoring.js';
 import { PASS, harshBlocked, level, streak, gradeOf, isDue, GRADE_NAMES, GRADE_NEED, MAX_GRADE } from '../coach/progress.js';
 import { isScored, isHarsh, TRACKS, lessonById } from '../content/curriculum.js';
-import { startMic, onFrame, audioCtx, setGate, setGritSensitivity, unlockAudio, getStream } from '../audio/engine.js';
+import { startMic, onFrame, audioCtx, setGate, setGritSensitivity, setNoiseFloor, getGate, micInfo, unlockAudio, getStream } from '../audio/engine.js';
 import { createBus, sfx } from '../audio/synth.js';
 import { toDb, weightIndex } from '../audio/features.js';
 import { midiName } from '../music/notes.js';
@@ -59,6 +59,7 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
   const st = getState();
   const frames = useRef([]);
   const t0 = useRef(null);
+  const peakRef = useRef(0);
   const [err, setErr] = useState(null);
   const [hud, setHud] = useState({ label: 'Preparando micrófono', sub: '' });
 
@@ -78,7 +79,11 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
       bus?.stop();
       if (rec?.state === 'recording') rec.stop();
       const res = scoreTake(plan, frames.current, { refDb: st.profile.refDb });
-      res.harshSecs = plan.view === 'energy' ? frames.current.filter((f) => f.kind === 'harsh').length / 60 : 0;
+      // Segundos reales de distorsión (cada dispositivo analiza a distinta velocidad)
+      let harsh = 0;
+      const fs = frames.current;
+      for (let i = 1; i < fs.length; i++) if (fs[i].kind === 'harsh') harsh += Math.min(0.1, fs[i].t - fs[i - 1].t);
+      res.harshSecs = plan.view === 'energy' ? harsh : 0;
       onDone(res);
     };
 
@@ -109,8 +114,22 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
       bus = createBus();
       scheduleAudio(bus, plan, t0.current, st.settings);
       window.__take = { plan, t0: t0.current }; // gancho para las pruebas automáticas (tools/e2e.mjs)
+      // El arranque de cada toma es silencio: sirve para medir el ruido del momento
+      const firstSound = plan.view === 'pitch' ? Math.min(...plan.segs.map((x) => x.t0)) : (plan.windows.find((w) => w.expect !== 'rest')?.t0 ?? 0.5);
+      const lead = [];
+      let leadDone = false;
       off = onFrame((f) => {
         const t = f.t - t0.current - LAT;
+        if (!leadDone) {
+          if (t < firstSound - 0.2) lead.push(f.rms);
+          else {
+            leadDone = true;
+            lead.sort((a, b) => a - b);
+            const med = lead.length >= 8 ? lead[Math.floor(lead.length / 2)] : 0;
+            if (med > micInfo().floor * 1.5) setNoiseFloor(med);
+          }
+        }
+        if (f.rms > peakRef.current) peakRef.current = f.rms;
         if (t < -0.2 || t > plan.dur + 0.3) return;
         frames.current.push({ t, midi: f.midi, voiced: f.voiced, clarity: f.clarity, rms: f.rms, db: f.db, centroid: f.centroid, kind: f.kind, grit: f.grit, weight: f.weight });
       });
@@ -192,11 +211,13 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
     </div>`;
   }
 
-  const gateDb = toDb(st.profile.gate);
+  // Escala de volumen relativa a este micrófono: del ruido de fondo a lo más fuerte que ha sonado
+  const gateDb = toDb(getGate());
+  const ceilDb = Math.min(-3, Math.max(gateDb + 24, toDb(peakRef.current) + 4));
   const draw = (g, w, h) => {
     const now = t0.current == null ? -1 : audioCtx().currentTime - t0.current;
     if (plan.view === 'pitch') drawPitch(g, w, h, { plan, frames: frames.current, now });
-    else drawEnergy(g, w, h, { plan, frames: frames.current, now, refDb: st.profile.refDb, gateDb });
+    else drawEnergy(g, w, h, { plan, frames: frames.current, now, refDb: st.profile.refDb, gateDb: toDb(getGate()), ceilDb: Math.min(-3, Math.max(toDb(getGate()) + 24, toDb(peakRef.current) + 4)) });
   };
 
   return html`<div class="take">
@@ -211,7 +232,7 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
     !plan.endOnSilence &&
     html`<div class="meters">
       <${Bar} label="Distorsión" value=${(hud.grit ?? 0) * 100} tone="ember" right=${`${Math.round((hud.grit ?? 0) * 100)} %`} />
-      <${Bar} label="Volumen" value=${(((hud.db ?? -60) - gateDb) / (-3 - gateDb)) * 100} tone="ice" right=" " />
+      <${Bar} label="Volumen" value=${(((hud.db ?? -60) - gateDb) / (ceilDb - gateDb)) * 100} tone="ice" right=" " />
     </div>`}
     <button class="btn ghost small" onClick=${onAbort}>Cancelar toma</button>
   </div>`;

@@ -8,7 +8,7 @@ import { lessonById } from '../content/curriculum.js';
 import { analyzeTake, songStatus, songMeta, songReady, recommend, heroPicks, isHero, goodDays, MASTER_DAYS, MASTER_SCORE } from '../coach/songs.js';
 import { harshBlocked } from '../coach/progress.js';
 import { parseLink, createPlayer, readPlaylist, fetchTitle, musicSearchUrl } from '../audio/youtube.js';
-import { startMic, stopMic, onFrame, audioCtx, unlockAudio, getStream, setGate, setGritSensitivity } from '../audio/engine.js';
+import { startMic, stopMic, onFrame, audioCtx, unlockAudio, getStream, setGate, setRoomGate, setGritSensitivity } from '../audio/engine.js';
 import { sfx } from '../audio/synth.js';
 import { midiName } from '../music/notes.js';
 import { useStore, getState, addSongToRepertoire, updateSong, deleteSong, saveSongTake, setFocusSong, setTaste, patchSettings } from '../store.js';
@@ -358,7 +358,8 @@ function SongView({ id, onBack }) {
     }
     const st = getState();
     const inRoom = !!st.settings.room;
-    setGate(inRoom ? Math.max(st.profile.gate, st.settings.roomGate) : st.profile.gate);
+    setGate(st.profile.gate);
+    setRoomGate(inRoom ? st.settings.roomGate : 0);
     setGritSensitivity(st.settings.grit ?? 1);
     frames.current = [];
     t0.current = audioCtx().currentTime;

@@ -103,3 +103,51 @@ export function singPlan(plan, errFn = () => 0) {
     return { midi: n.midi + errFn(t, n) / 100 };
   });
 }
+
+// ───── Voz sintética realista: pulsos glotales + formantes de vocal + temblor + ruido ─────
+export const VOWELS = {
+  a: [730, 1090, 2440],
+  e: [530, 1840, 2480],
+  i: [270, 2290, 3010],
+  o: [570, 840, 2410],
+  u: [300, 870, 2240],
+};
+
+/**
+ * tilt: caída de la fuente en dB por octava (≈ -12 voz llena, -20 voz ligera)
+ * jitter: variación aleatoria del periodo (0.01 = 1 %); noise: ruido relativo a la señal
+ */
+export function vowelVoice(f0, vowel = 'a', { n = N, sr = SR, tilt = -12, jitter = 0.008, shimmer = 0.05, noise = 0.03, seed = 5, amp = 0.2 } = {}) {
+  const r = rng(seed);
+  const F = VOWELS[vowel];
+  const gain = (f) => {
+    let g = Math.pow(f / f0, tilt / 6.02);
+    for (const [i, fc] of F.entries()) {
+      const q = [8, 10, 12][i];
+      const x = f / fc;
+      g *= 1 / Math.sqrt((1 - x * x) ** 2 + (x / q) ** 2);
+    }
+    return g;
+  };
+  const K = Math.floor(5000 / f0);
+  const gains = [];
+  for (let k = 1; k <= K; k++) gains.push(gain(k * f0));
+  const peak = gains.reduce((a, b) => a + b, 0);
+  const b = new Float32Array(n);
+  let phase = 0;
+  let period = 1;
+  let shim = 1;
+  let nextCycle = 0;
+  for (let i = 0; i < n; i++) {
+    if (phase >= nextCycle) {
+      period = 1 + (r() * 2 - 1) * jitter; // cada ciclo dura un poco distinto
+      shim = 1 + (r() * 2 - 1) * shimmer;
+      nextCycle += 1;
+    }
+    phase += (f0 / sr) / period;
+    let x = 0;
+    for (let k = 1; k <= K; k++) x += gains[k - 1] * Math.sin(2 * Math.PI * k * phase);
+    b[i] = amp * shim * (x / peak) * 3 + (r() * 2 - 1) * noise * amp;
+  }
+  return b;
+}

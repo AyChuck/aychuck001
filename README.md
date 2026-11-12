@@ -100,6 +100,16 @@ Además:
 - **Escúchate**: cada toma se puede reproducir al terminar (no se guarda).
 - **Cuidado de la voz**: calentamiento obligatorio, máximo 4 minutos de guturales al día, y revisión de garganta después de cada bloque. Si reportas dolor, los guturales se bloquean 24 horas.
 
+## Si la app no te oye bien
+
+En **Ajustes → Probar micrófono** hay una prueba de 7 segundos (2 de silencio, 4 cantando "aaa"). Dice si el problema viene del dispositivo, del lugar o del algoritmo de la app, y genera un reporte de texto con números técnicos (nivel, ruido, claridad, nota detectada, frecuencia de muestreo) para copiar y mandar.
+
+La app se adapta sola al nivel de cada micrófono: sigue el ruido de fondo del lugar y lo mide otra vez al arrancar cada toma. Los iPad y iPhone entregan la señal muy baja cuando se apagan los filtros de llamada; eso es normal y ya está contemplado. Si cambias de app a media sesión y el sistema corta el micrófono, la app lo vuelve a pedir en la siguiente toma.
+
+## Dónde se guarda tu progreso
+
+En el almacenamiento del navegador de ese dispositivo. Sobrevive a apagar y reiniciar. No se sube a ningún servidor, así que nadie más puede verlo. Se pierde si borras los datos del navegador, y cada navegador (y la app instalada en la pantalla de inicio) tiene su propia copia. En **Ajustes → Tus datos** puedes crear un respaldo y restaurarlo en otro dispositivo.
+
 ## Lo que la app no puede hacer
 
 - **No ve tu garganta.** El detector de distorsión mide qué tan "sucio" suena el audio, no si lo estás produciendo de forma sana. Por eso la app insiste en volumen bajo y te pregunta cómo te sientes. Si algo duele, para.

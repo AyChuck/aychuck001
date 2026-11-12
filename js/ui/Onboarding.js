@@ -5,6 +5,7 @@ import { Icon, Choice, Canvas } from './common.js';
 import { drawPitch } from './rolls.js';
 import { startMic, onFrame, calibrate, audioCtx, unlockAudio } from '../audio/engine.js';
 import { midiName, voiceType, rangeLabel } from '../music/notes.js';
+import { toDb } from '../audio/features.js';
 import { getState, setState, patchProfile, patchSettings } from '../store.js';
 
 const PRESETS = {
@@ -34,16 +35,20 @@ export function RangeTest({ onDone, onSkip }) {
       if (el >= 14) {
         clearInterval(id);
         off();
-        // Semitonos sostenidos al menos ~0.12 s con tono claro
+        // Semitonos sostenidos al menos ~0.1 s con tono claro (por tiempo, no por cuadros:
+        // cada dispositivo analiza a distinta velocidad)
         const hist = new Map();
         const dbs = [];
+        let prevT = null;
         for (const f of frames.current) {
-          if (!f.voiced || f.clarity < 0.85) continue;
+          const dt = prevT == null ? 0.016 : Math.min(0.1, f.t - prevT);
+          prevT = f.t;
+          if (!f.voiced || f.clarity < 0.8) continue;
           const m = Math.round(f.midi);
-          hist.set(m, (hist.get(m) ?? 0) + 1);
+          hist.set(m, (hist.get(m) ?? 0) + dt);
           dbs.push(f.db);
         }
-        const ok = [...hist.entries()].filter(([, n]) => n >= 7).map(([m]) => m).sort((a, b) => a - b);
+        const ok = [...hist.entries()].filter(([, secs]) => secs >= 0.1).map(([m]) => m).sort((a, b) => a - b);
         if (ok.length < 5 || ok[ok.length - 1] - ok[0] < 7) {
           setFound(null);
           setErr('No alcancé a escuchar suficiente. Acércate al micrófono y desliza la voz despacio, como sirena.');
@@ -129,7 +134,8 @@ export function Onboarding() {
 
   useEffect(() => {
     if (mic !== 'ok') return undefined;
-    return onFrame((f) => setLevel((l) => l * 0.8 + Math.min(1, f.rms * 8) * 0.2));
+    // Nivel relativo al ruido de fondo: así la barra se mueve aunque el micrófono entregue poco
+    return onFrame((f) => setLevel((l) => l * 0.8 + Math.min(1, Math.max(0, (f.db - toDb(f.gate)) / 30)) * 0.2));
   }, [mic]);
 
   const enableMic = async () => {

@@ -4,6 +4,7 @@ import { html, useState, useMemo, useRef } from '../lib.js';
 import { Icon, Stars, Bar, Toggle, Choice } from './common.js';
 import { GradePips } from './Player.js';
 import { RangeTest } from './Onboarding.js';
+import { MicTest } from './MicTest.js';
 import { buildSession, lessonSession, reviewSession, singleSession, estimateMinutes } from '../coach/planner.js';
 import {
   streak, week, level, lessonStatus, stageStatus, stepStatus, nextLesson, harshBlocked, harshLeft, lessonAllowed, canStart,
@@ -307,10 +308,13 @@ export function Progress() {
 export function Settings() {
   const s = useStore();
   const [range, setRange] = useState(false);
+  const [micTest, setMicTest] = useState(false);
   const [msg, setMsg] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [backup, setBackup] = useState(null);
   const file = useRef(null);
+
+  if (micTest) return html`<${MicTest} onBack=${() => setMicTest(false)} />`;
 
   if (range) {
     return html`<div class="screen">
@@ -352,6 +356,13 @@ export function Settings() {
   return html`<div class="screen">
     <header class="top"><h1 class="title">Ajustes</h1></header>
     ${msg && html`<div class="note" role="status">${msg}</div>`}
+
+    <section class="panel">
+      <div class="panel-head"><h2>Micrófono</h2></div>
+      <p class="muted small">Si la app no te oye, la línea salta o los puntajes no tienen sentido, corre esta prueba: dice si es el dispositivo, el lugar o la app.</p>
+      <button class="btn primary" onClick=${() => setMicTest(true)}><${Icon} name="mic" size=${18} /> Probar micrófono (7 s)</button>
+      <${Toggle} id="set-voice" label="Procesamiento de voz del sistema" hint="Sube el volumen del micrófono, pero recorta notas largas y screams. Déjalo apagado salvo que la prueba lo recomiende" checked=${!!s.settings.micVoice} onChange=${(v) => patchSettings({ micVoice: v })} />
+    </section>
 
     <section class="panel">
       <div class="panel-head"><h2>Sonido</h2></div>
@@ -404,9 +415,9 @@ export function Settings() {
 
     <section class="panel">
       <div class="panel-head"><h2>Tus datos</h2></div>
-      <p class="muted small">El progreso vive solo en este dispositivo y navegador. Guarda un respaldo si vas a cambiar de teléfono.</p>
+      <p class="muted small">Tu progreso se guarda solo, en este dispositivo y en este navegador, y sigue ahí aunque apagues o reinicies. No se sube a ningún servidor: nadie más lo puede ver, ni siquiera quien hizo la app. Se pierde si borras los datos del navegador o si usas otro navegador o dispositivo, así que crea un respaldo de vez en cuando.${s.settings.lastBackup ? ` Último respaldo: ${s.settings.lastBackup}.` : ' Todavía no has creado ninguno.'}</p>
       <div class="row">
-        <button class="btn ghost" onClick=${() => setBackup(exportData())}>Crear respaldo</button>
+        <button class="btn ghost" onClick=${() => { patchSettings({ lastBackup: dayKey() }); setBackup(exportData()); }}>Crear respaldo</button>
         <button class="btn ghost" onClick=${() => file.current.click()}>Restaurar respaldo</button>
         <input ref=${file} id="set-import" type="file" accept="application/json,.json" hidden onChange=${onImport} />
       </div>

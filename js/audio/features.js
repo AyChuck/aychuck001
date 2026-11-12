@@ -96,8 +96,11 @@ export const toDb = (rms) => 20 * Math.log10(Math.max(rms, 1e-7));
  * Es la huella acústica del registro:
  *  - voz llena (pecho, belt): las cuerdas chocan con todo su cuerpo → muchos armónicos fuertes → peso alto
  *  - voz ligera (cabeza, falsete): solo vibra el borde → casi solo la fundamental → peso bajo
- * Devuelve dB (aprox. de -20 a +15). Depende de la vocal y del micrófono, por eso
- * los ejercicios comparan tus dos voces entre sí y no contra un número fijo.
+ * Devuelve dB (aprox. de -30 a +15). El valor absoluto depende mucho de la vocal y de la
+ * nota (con "i" y "u" casi todo es fundamental), así que NO sirve para etiquetar un sonido
+ * suelto. Sí sirve comparando la misma nota con la misma vocal abierta ("ah", "eh"):
+ * ahí la voz llena queda 10 dB o más por encima de la ligera. Por eso los ejercicios
+ * comparan tus dos voces entre sí.
  */
 export function createWeightMeter(sampleRate, size) {
   const hann = new Float32Array(size);
@@ -127,12 +130,39 @@ export function createWeightMeter(sampleRate, size) {
       if (k === 1) h1 = p;
       else rest += p;
     }
-    return Math.max(-30, Math.min(30, 10 * Math.log10((rest + 1e-12) / (h1 + 1e-12))));
+    return Math.max(-60, Math.min(30, 10 * Math.log10((rest + 1e-12) / (h1 + 1e-12))));
   };
 }
 
 /** Peso en dB → índice 0 (muy ligera) a 1 (muy llena), para medidores y colores. */
 export const weightIndex = (db) => (db == null ? null : Math.max(0, Math.min(1, (db + 12) / 22)));
+
+/**
+ * Puerta de ruido adaptativa. Sigue el ruido de fondo del lugar y del micrófono:
+ * baja rápido cuando hay silencio y sube despacio, solo con sonidos cercanos al piso
+ * (así tu voz, que es mucho más fuerte, nunca la mueve). Hace que la app funcione
+ * igual con un micrófono que entrega la señal muy baja (iPad sin ganancia automática)
+ * que con uno fuerte.
+ */
+export function createNoiseGate(initialGate = 0.004) {
+  const MIN_FLOOR = 0.0002;
+  let floor = Math.max(MIN_FLOOR, initialGate / 3.2);
+  const gate = () => Math.min(0.08, Math.max(0.001, floor * 3.2));
+  return {
+    update(rms) {
+      if (rms < floor) floor += (rms - floor) * 0.2;
+      else if (rms < floor * 4) floor += (rms - floor) * 0.01;
+      if (floor < MIN_FLOOR) floor = MIN_FLOOR;
+      return gate();
+    },
+    gate,
+    floor: () => floor,
+    /** Fija el piso a partir de una medición de silencio (calibración). */
+    setFloor(rms) {
+      floor = Math.max(MIN_FLOOR, rms);
+    },
+  };
+}
 
 /** Índice de distorsión 0..1 a partir de la claridad del tono. */
 export const gritFrom = (clarity) => Math.max(0, Math.min(1, (0.9 - clarity) / 0.45));

@@ -38,7 +38,7 @@ export function defaultState() {
     v: 2,
     onboarded: false,
     profile: { goal: 'both', exp: 'new', low: 45, high: 64, firstLow: null, firstHigh: null, refDb: null, gate: 0.012, tested: false },
-    settings: { headphones: false, guide: true, strict: 1, sfx: true, grit: 1, room: false, roomGate: null },
+    settings: { headphones: false, guide: true, strict: 1, sfx: true, grit: 1, room: false, roomGate: null, micVoice: false, lastBackup: null },
     xp: 0,
     days: {},
     ex: {},

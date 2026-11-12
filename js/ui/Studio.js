@@ -3,7 +3,7 @@
 import { html, useState, useEffect, useRef } from '../lib.js';
 import { Icon, Canvas, Bar } from './common.js';
 import { drawPitch } from './rolls.js';
-import { startMic, onFrame, audioCtx, unlockAudio, getStream, setGate, setGritSensitivity } from '../audio/engine.js';
+import { startMic, onFrame, audioCtx, unlockAudio, getStream, setGate, getGate, micInfo, setGritSensitivity } from '../audio/engine.js';
 import { createBus } from '../audio/synth.js';
 import { midiName } from '../music/notes.js';
 import { toDb } from '../audio/features.js';
@@ -135,7 +135,8 @@ export function Studio() {
     </div>`;
   }
 
-  const gateDb = toDb(s.profile.gate);
+  const gateDb = toDb(getGate());
+  const ceilDb = Math.min(-3, Math.max(gateDb + 24, toDb(micInfo().peak) + 4));
   const kindName = { clean: 'Voz limpia', harsh: 'Distorsión', hiss: 'Aire', silence: 'Silencio' }[live.kind];
   return html`<div class="screen">
     <header class="top"><h1 class="title">Práctica libre</h1></header>
@@ -150,7 +151,7 @@ export function Studio() {
     <${WeightMeter} db=${live.weight} />
     <div class="meters">
       <${Bar} label="Distorsión" value=${live.grit * 100} tone="ember" right=${`${Math.round(live.grit * 100)} %`} />
-      <${Bar} label="Volumen" value=${((live.db - gateDb) / (-3 - gateDb)) * 100} tone="ice" right=${kindName} />
+      <${Bar} label="Volumen" value=${((live.db - gateDb) / (ceilDb - gateDb)) * 100} tone="ice" right=${kindName} />
     </div>
     ${span && html`<p class="muted small">En esta sesión: de ${midiName(span[0])} a ${midiName(span[1])}.</p>`}
     <div class="row">

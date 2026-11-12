@@ -8,7 +8,7 @@ import { Studio } from './ui/Studio.js';
 import { Songs } from './ui/Songs.js';
 import { Player } from './ui/Player.js';
 import { reviewSession } from './coach/planner.js';
-import { stopMic } from './audio/engine.js';
+import { stopMic, setMicMode } from './audio/engine.js';
 import { useStore, getState, setState } from './store.js';
 
 const TABS = [
@@ -30,6 +30,8 @@ function App() {
   const [session, setSession] = useState(null);
   const [run, setRun] = useState(0);
   const [songId, setSongId] = useState(null);
+
+  useEffect(() => setMicMode(s.settings.micVoice ? 'voice' : 'raw'), [s.settings.micVoice]);
 
   useEffect(() => {
     const on = () => setTab(tabFromHash());
@@ -85,6 +87,13 @@ function App() {
 }
 
 render(html`<${App} />`, document.getElementById('app'));
+
+// Pide al navegador que no borre el progreso por su cuenta (lo concede sobre todo a apps instaladas)
+try {
+  navigator.storage?.persist?.().catch(() => {});
+} catch {
+  /* no disponible */
+}
 
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('./sw.js').catch(() => {});

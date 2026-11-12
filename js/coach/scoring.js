@@ -547,7 +547,7 @@ const TIPS = {
   missedHits: ['Faltaron golpes', 'Sigue el pulso con el cuerpo (cabeza o pie) y marca cada sílaba corta y seca: "¡ha!".'],
   timingLoose: ['El ritmo quedó suelto', 'Cuenta en voz baja "1 y 2 y" durante la guía. Los golpes cortos son más fáciles de clavar.'],
   extraHits: ['Hubo golpes de más', 'Solo en las marcas. Respira por la boca en los silencios.'],
-  regSame: ['Las dos voces sonaron casi igual', 'Exagera la diferencia. Ligera: la mitad de volumen, bostezo por dentro, "uu" de búho y un poco de aire. Llena: di la nota como si hablaras, "¡ey!", firme y sin aire. Tu línea debe cambiar de color.'],
+  regSame: ['Las dos voces sonaron casi igual', 'Exagera la diferencia, con la misma vocal ("ah") en las dos. Ligera: la mitad de volumen, bostezo por dentro y un poco de aire. Llena: di la nota como si hablaras, firme y sin aire. Tu línea debe cambiar de color.'],
   regFlip: ['Salieron al revés', 'Donde dice "llena" va tu voz de hablar, con cuerpo. Donde dice "ligera" va la de búho, suave y con aire.'],
   regUnknown: ['No alcancé a medir tu registro', 'Sostén cada nota completa con una vocal abierta ("ah") para que pueda comparar las dos voces.'],
   mixLight: ['Tu mezcla quedó casi en voz ligera', 'Súmale cierre: sonido nasal y burlón de "nei", sin aire, como si te quejaras. Mismo volumen bajo.'],

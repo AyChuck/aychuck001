@@ -62,6 +62,27 @@ export function createYin(sampleRate, size, opts = {}) {
       }
     }
 
+    // Corrección de octava: cuando el 2.º (o 3.er) armónico domina —pasa mucho en voces
+    // reales con vocales abiertas—, medio periodo también parece periódico y YIN lo elige.
+    // Si el doble (o triple) de ese periodo es claramente MÁS periódico, ese es el real.
+    for (let pass = 0; pass < 2; pass++) {
+      let moved = false;
+      for (const k of [2, 3]) {
+        const center = tau * k;
+        if (center - 2 > tauMax) continue;
+        let best = -1;
+        for (let t = Math.max(tauMin, center - 2); t <= Math.min(tauMax, center + 2); t++) {
+          if (best === -1 || d[t] < d[best]) best = t;
+        }
+        if (best !== -1 && d[tau] - d[best] > 0.03 && d[best] < d[tau] * 0.5) {
+          tau = best;
+          moved = true;
+          break;
+        }
+      }
+      if (!moved) break;
+    }
+
     const clarity = Math.max(0, Math.min(1, 1 - d[tau]));
 
     // Interpolación parabólica para precisión sub-muestra

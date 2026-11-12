@@ -263,7 +263,7 @@ export function drawEnergy(g, w, h, o) {
   const laneH = 26;
   const top = plan.rhythm ? 78 : 42;
   const floor = o.gateDb ?? -48;
-  const ceil = -3;
+  const ceil = o.ceilDb ?? -3;
   const H = h - top - 8;
   const Yd = (db) => h - 8 - Math.max(0, Math.min(1, (db - floor) / (ceil - floor))) * H;
 
