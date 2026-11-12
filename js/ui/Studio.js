@@ -8,12 +8,13 @@ import { createBus } from '../audio/synth.js';
 import { midiName } from '../music/notes.js';
 import { toDb } from '../audio/features.js';
 import { useStore } from '../store.js';
+import { WeightMeter } from './Player.js';
 
 export function Studio() {
   const s = useStore();
   const [on, setOn] = useState(false);
   const [err, setErr] = useState(null);
-  const [live, setLive] = useState({ note: '—', cents: 0, voiced: false, grit: 0, db: -60, kind: 'silence' });
+  const [live, setLive] = useState({ note: '—', cents: 0, voiced: false, grit: 0, db: -60, kind: 'silence', weight: null });
   const [span, setSpan] = useState(null);
   const [drone, setDrone] = useState(false);
   const [rec, setRec] = useState('idle'); // idle | rec | done
@@ -40,7 +41,7 @@ export function Studio() {
       }
       if (n++ % 6 === 0) {
         const near = Math.round(f.midi);
-        setLive({ note: f.voiced ? midiName(near) : '—', cents: f.voiced ? Math.round((f.midi - near) * 100) : 0, voiced: f.voiced, grit: f.grit, db: f.db, kind: f.kind });
+        setLive({ note: f.voiced ? midiName(near) : '—', cents: f.voiced ? Math.round((f.midi - near) * 100) : 0, voiced: f.voiced, grit: f.grit, db: f.db, kind: f.kind, weight: f.weight });
         if (hi > lo) setSpan([Math.round(lo), Math.round(hi)]);
       }
     });
@@ -118,7 +119,7 @@ export function Studio() {
         v.hi += d;
       }
     }
-    drawPitch(g, w, h, { plan: null, frames: fs, now, ...view.current });
+    drawPitch(g, w, h, { plan: null, frames: fs, now, byWeight: true, ...view.current });
   };
 
   if (!on) {
@@ -127,7 +128,7 @@ export function Studio() {
       <section class="hero-card">
         <div class="eyebrow">Sin calificación</div>
         <h1>Canta lo que quieras</h1>
-        <p class="lead">Pon tu canción favorita en los audífonos y canta encima. Aquí ves tu nota en vivo, cuánta distorsión llevas y puedes grabarte para escucharte.</p>
+        <p class="lead">Aquí ves tu nota en vivo, si estás en voz llena o ligera (la línea cambia de naranja a azul), cuánta distorsión llevas, y puedes grabarte para escucharte.</p>
         <button class="btn primary big" onClick=${start}><${Icon} name="mic" /> Abrir micrófono</button>
         ${err && html`<p class="note warn">${err}</p>`}
       </section>
@@ -146,6 +147,7 @@ export function Studio() {
       <div class="needle-labels"><span>bajo</span><span>${live.voiced ? `${live.cents > 0 ? '+' : ''}${live.cents} cents` : kindName}</span><span>alto</span></div>
     </section>
     <${Canvas} draw=${draw} class="pitch" />
+    <${WeightMeter} db=${live.weight} />
     <div class="meters">
       <${Bar} label="Distorsión" value=${live.grit * 100} tone="ember" right=${`${Math.round(live.grit * 100)} %`} />
       <${Bar} label="Volumen" value=${((live.db - gateDb) / (-3 - gateDb)) * 100} tone="ice" right=${kindName} />

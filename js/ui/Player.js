@@ -10,7 +10,7 @@ import { PASS, harshBlocked, level, streak, gradeOf, isDue, GRADE_NAMES, GRADE_N
 import { isScored, isHarsh, TRACKS, lessonById } from '../content/curriculum.js';
 import { startMic, onFrame, audioCtx, setGate, setGritSensitivity, unlockAudio, getStream } from '../audio/engine.js';
 import { createBus, sfx } from '../audio/synth.js';
-import { toDb } from '../audio/features.js';
+import { toDb, weightIndex } from '../audio/features.js';
 import { midiName } from '../music/notes.js';
 import { useStore, getState, recordStep, setThroat } from '../store.js';
 
@@ -112,7 +112,7 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
       off = onFrame((f) => {
         const t = f.t - t0.current - LAT;
         if (t < -0.2 || t > plan.dur + 0.3) return;
-        frames.current.push({ t, midi: f.midi, voiced: f.voiced, clarity: f.clarity, rms: f.rms, db: f.db, centroid: f.centroid, kind: f.kind, grit: f.grit });
+        frames.current.push({ t, midi: f.midi, voiced: f.voiced, clarity: f.clarity, rms: f.rms, db: f.db, centroid: f.centroid, kind: f.kind, grit: f.grit, weight: f.weight });
       });
 
       timer = setInterval(() => {
@@ -135,12 +135,15 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
               else [sub, tone] = ['Baja', 'warn'];
             } else sub = midiName(last.midi);
           }
+          const regName = { chest: 'Voz llena', head: 'Voz ligera', mix: 'Mezcla' }[note?.reg];
+          const recentW = fs.slice(-10).filter((f) => f.weight != null && now - f.t < 0.3).map((f) => f.weight);
           setHud({
-            label: seg ? (seg.type === 'listen' ? 'Escucha' : 'Tu turno') : next ? (next.type === 'listen' ? 'Escucha' : 'Respira') : 'Listo',
-            kind: seg?.type ?? 'gap',
+            label: seg ? (seg.type === 'listen' ? 'Escucha' : regName ?? 'Tu turno') : next ? (next.type === 'listen' ? 'Escucha' : 'Respira') : 'Listo',
+            kind: seg?.type === 'sing' && note?.reg ? note.reg : (seg?.type ?? 'gap'),
             sub,
             tone,
             syl: step.syl,
+            weight: recentW.length ? recentW.reduce((a, b) => a + b, 0) / recentW.length : null,
           });
         } else {
           const win = plan.windows.find((x) => now >= x.t0 && now < x.t1);
@@ -202,6 +205,7 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
       <div class=${`hud-sub ${hud.tone ?? ''}`}>${hud.sub || (hud.kind === 'sing' && hud.syl ? `"${hud.syl}"` : '')}</div>
     </div>
     <${Canvas} draw=${draw} class=${plan.view} />
+    ${(plan.reg || plan.connect) && html`<${WeightMeter} db=${hud.weight} />`}
     ${plan.view === 'energy' &&
     !plan.rhythm &&
     !plan.endOnSilence &&
@@ -210,6 +214,15 @@ function Take({ step, plan, onDone, onAbort, onAudio }) {
       <${Bar} label="Volumen" value=${(((hud.db ?? -60) - gateDb) / (-3 - gateDb)) * 100} tone="ice" right=" " />
     </div>`}
     <button class="btn ghost small" onClick=${onAbort}>Cancelar toma</button>
+  </div>`;
+}
+
+/** Medidor de registro: de voz ligera (cabeza) a voz llena (pecho). */
+export function WeightMeter({ db }) {
+  const k = weightIndex(db);
+  return html`<div class="weight" aria-label="Peso de la voz">
+    <div class="weight-track"><i style=${`left:${(k ?? 0.5) * 100}%`} class=${k == null ? 'off' : ''}></i></div>
+    <div class="weight-labels"><span>ligera · cabeza</span><span>${k == null ? '' : k > 0.62 ? 'llena' : k < 0.38 ? 'ligera' : 'intermedia'}</span><span>llena · pecho</span></div>
   </div>`;
 }
 

@@ -20,6 +20,14 @@ export const C = {
 };
 
 const FONT = '600 11px ui-sans-serif, system-ui, sans-serif';
+
+/** Color del registro: azul = voz ligera, naranja = voz llena. */
+export function weightColor(db) {
+  const k = Math.max(0, Math.min(1, (db + 12) / 22));
+  const a = [95, 227, 255];
+  const b = [255, 91, 46];
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * k)).join(',')})`;
+}
 const GUTTER = 34;
 
 function rr(g, x, y, w, h, r) {
@@ -167,6 +175,7 @@ export function drawPitch(g, w, h, o) {
   g.lineCap = 'round';
   let prev = null;
   let ni = 0;
+  const byWeight = o.byWeight ?? !!(plan?.reg || plan?.connect); // en ejercicios de registro, el color es el peso
   const sing = plan ? plan.notes.filter((n) => n.seg === 'sing') : [];
   for (const f of frames) {
     const x = X(f.t);
@@ -183,7 +192,7 @@ export function drawPitch(g, w, h, o) {
     const good = tg ? Math.abs(f.midi - tg.midi) <= tol * 1.15 : true;
     const y = Math.max(4, Math.min(h - 4, Y(f.midi)));
     if (prev && f.t - prev.t < 0.12 && Math.abs(f.midi - prev.midi) < 3) {
-      g.strokeStyle = !tg ? C.ice : good ? C.ok : C.warn;
+      g.strokeStyle = byWeight ? (f.weight != null ? weightColor(f.weight) : C.muted) : !tg ? C.ice : good ? C.ok : C.warn;
       g.beginPath();
       g.moveTo(prev.x, prev.y);
       g.lineTo(x, y);
@@ -193,6 +202,23 @@ export function drawPitch(g, w, h, o) {
   }
 
   g.restore();
+
+  if (byWeight) {
+    // Leyenda del color
+    const x = w - 150;
+    const grad = g.createLinearGradient(x + 42, 0, x + 102, 0);
+    grad.addColorStop(0, weightColor(-12));
+    grad.addColorStop(1, weightColor(10));
+    g.fillStyle = grad;
+    g.fillRect(x + 42, 9, 60, 5);
+    g.fillStyle = C.muted;
+    g.font = FONT;
+    g.textBaseline = 'middle';
+    g.textAlign = 'right';
+    g.fillText('ligera', x + 38, 12);
+    g.textAlign = 'left';
+    g.fillText('llena', x + 106, 12);
+  }
 
   // Línea del "ahora" y punto de la voz
   g.strokeStyle = 'rgba(236,232,223,0.5)';
@@ -206,9 +232,10 @@ export function drawPitch(g, w, h, o) {
     const y = Y(last.midi);
     const out = y < 4 || y > h - 4;
     const cy = Math.max(8, Math.min(h - 8, y));
-    g.shadowColor = C.ice;
+    const dot = byWeight && last.weight != null ? weightColor(last.weight) : C.ice;
+    g.shadowColor = dot;
     g.shadowBlur = 14;
-    g.fillStyle = C.ice;
+    g.fillStyle = dot;
     g.beginPath();
     if (out) {
       const up = y < 4;

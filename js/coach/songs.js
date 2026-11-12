@@ -234,6 +234,7 @@ export function recommend(state, n = 6, day = Math.floor(Date.now() / 86400000))
   const t = tier(state);
   const scenes = new Set(state.taste?.length ? state.taste : ['posthc', 'punk', 'metal', 'core', 'es']);
   const clean = state.profile.goal === 'clean';
+  const heroes = new Set(state.heroes ?? []);
   const pool = CATALOG.filter((s) => scenes.has(s.scene) && !state.songs[s.id] && !(clean && s.tags.includes('scream') && s.tags.length <= 2));
   const rank = (s) => {
     const { ready, missing } = songReady(state, s);
@@ -241,7 +242,7 @@ export function recommend(state, n = 6, day = Math.floor(Date.now() / 86400000))
     // Estable dentro del día, distinto cada día
     let h = day;
     for (const c of s.id) h = (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0;
-    return (ready ? 0 : 20 + missing.length * 6) + (reach > 0 ? reach * 14 : -reach * 3) + (h % 1000) / 100;
+    return (ready ? 0 : 20 + missing.length * 6) + (reach > 0 ? reach * 14 : -reach * 3) + (h % 1000) / 100 - (heroes.has(s.artist) ? 9 : 0);
   };
   const sorted = [...pool].sort((a, b) => rank(a) - rank(b));
   // Variedad: máximo 2 por artista y que aparezcan varias escenas
@@ -256,6 +257,22 @@ export function recommend(state, n = 6, day = Math.floor(Date.now() / 86400000))
     perScene[s.scene] = (perScene[s.scene] ?? 0) + 1;
     if (out.length >= n) break;
   }
+  return out;
+}
+
+export const isHero = (state, artist) => (state.heroes ?? []).includes(artist);
+
+/**
+ * Canciones de tus referentes, de la más alcanzable a la más difícil, alternando artistas.
+ * Se muestran aunque todavía no tengas toda la técnica: son la meta a la vista.
+ */
+export function heroPicks(state, n = 4) {
+  const heroes = state.heroes ?? [];
+  const per = heroes.map((a) =>
+    CATALOG.filter((s) => s.artist === a && !state.songs[s.id]).sort((x, y) => songReady(state, x).missing.length - songReady(state, y).missing.length || x.level - y.level)
+  );
+  const out = [];
+  for (let i = 0; out.length < n && per.some((l) => l[i]); i++) for (const l of per) if (l[i] && out.length < n) out.push(l[i]);
   return out;
 }
 

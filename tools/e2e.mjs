@@ -47,6 +47,12 @@ await page.addInitScript((detune) => {
     const gv = mk();
     osc.connect(lp).connect(gv);
     osc.start();
+    // Voz ligera (cabeza/falsete): casi solo la fundamental
+    const osc2 = c.createOscillator();
+    osc2.type = 'sine';
+    const gl = mk();
+    osc2.connect(gl);
+    osc2.start();
     // Aire ("sss")
     const nb = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
     const nd = nb.getChannelData(0);
@@ -82,10 +88,20 @@ await page.addInitScript((detune) => {
     const gs = mk();
     scr.connect(gs);
     scr.start();
-    S = { c, osc, gv, gh, gs };
+    S = { c, osc, osc2, gv, gl, gh, gs };
     return dest.stream;
   };
 
+  const F = {
+    set(f, t) {
+      S.osc.frequency.setValueAtTime(f, t);
+      S.osc2.frequency.setValueAtTime(f, t);
+    },
+    ramp(f, t) {
+      S.osc.frequency.exponentialRampToValueAtTime(f, t);
+      S.osc2.frequency.exponentialRampToValueAtTime(f, t);
+    },
+  };
   const on = (g, t0, t1, v) => {
     g.gain.setValueAtTime(v, t0);
     g.gain.setValueAtTime(0, t1);
@@ -93,16 +109,16 @@ await page.addInitScript((detune) => {
 
   window.__singSiren = (lo, hi, secs) => {
     const t = S.c.currentTime + 0.3;
-    S.osc.frequency.setValueAtTime(midiToFreq(lo), t);
-    S.osc.frequency.exponentialRampToValueAtTime(midiToFreq(hi), t + secs / 2);
-    S.osc.frequency.exponentialRampToValueAtTime(midiToFreq(lo), t + secs);
+    F.set(midiToFreq(lo), t);
+    F.ramp(midiToFreq(hi), t + secs / 2);
+    F.ramp(midiToFreq(lo), t + secs);
     on(S.gv, t, t + secs, 0.3);
   };
 
   window.__singMelody = (midis, secs) => {
     let t = S.c.currentTime + 0.2;
     for (const m of midis) {
-      S.osc.frequency.setValueAtTime(midiToFreq(m), t);
+      F.set(midiToFreq(m), t);
       on(S.gv, t, t + secs - 0.12, 0.3);
       t += secs;
     }
@@ -150,12 +166,17 @@ await page.addInitScript((detune) => {
     if (plan.view === 'pitch') {
       for (const n of plan.notes) {
         if (n.seg !== 'sing') continue;
-        S.osc.frequency.setValueAtTime(midiToFreq(n.midi), t0 + n.t0 + lag);
-        on(S.gv, t0 + n.t0 + lag, t0 + n.t1, 0.3);
+        F.set(midiToFreq(n.midi), t0 + n.t0 + lag);
+        // Registro pedido: llena = timbre rico, ligera = casi senoidal, mezcla = entre las dos
+        if (n.reg === 'head') on(S.gl, t0 + n.t0 + lag, t0 + n.t1, 0.3);
+        else if (n.reg === 'mix') {
+          on(S.gl, t0 + n.t0 + lag, t0 + n.t1, 0.3);
+          on(S.gv, t0 + n.t0 + lag, t0 + n.t1, 0.1);
+        } else on(S.gv, t0 + n.t0 + lag, t0 + n.t1, 0.3);
       }
       for (const p of plan.paths) {
-        S.osc.frequency.setValueAtTime(midiToFreq(p.pts[0][1]), t0 + p.t0 + lag);
-        for (const [t, m] of p.pts.slice(1)) S.osc.frequency.exponentialRampToValueAtTime(midiToFreq(m), t0 + t);
+        F.set(midiToFreq(p.pts[0][1]), t0 + p.t0 + lag);
+        for (const [t, m] of p.pts.slice(1)) F.ramp(midiToFreq(m), t0 + t);
         on(S.gv, t0 + p.t0 + lag, t0 + p.t1, 0.3);
       }
     } else if (plan.rhythm) {
@@ -164,7 +185,7 @@ await page.addInitScript((detune) => {
       for (const w of plan.windows) {
         if (w.expect === 'harsh') on(S.gs, t0 + w.t0 + lag, t0 + w.t1, 0.5);
         if (w.expect === 'clean') {
-          S.osc.frequency.setValueAtTime(150, t0 + w.t0);
+          F.set(150, t0 + w.t0);
           on(S.gv, t0 + w.t0 + lag, t0 + w.t1 - 0.05, 0.3);
         }
         if (w.expect === 'hiss') on(S.gh, t0 + w.t0 + 0.2, t0 + w.t0 + 0.2 + plan.target + 1, 0.5);
@@ -235,7 +256,7 @@ async function drive() {
       await page.waitForFunction(() => window.__take && document.querySelector('.hud-label')?.textContent !== 'Preparando micrófono', null, { timeout: 8000 });
       const info = await page.evaluate(() => {
         const p = window.__take.plan;
-        return { dur: window.__perform(), kind: p.view === 'pitch' ? (p.paths.length ? 'slide' : p.notes.some((n) => n.text) ? 'lyrics' : 'pitch') : p.rhythm ? 'rhythm' : p.endOnSilence ? 'breath' : 'windows' };
+        return { dur: window.__perform(), kind: p.view === 'pitch' ? (p.paths.length ? 'slide' : p.reg ? 'registro' : p.notes.some((n) => n.text) ? 'lyrics' : 'pitch') : p.rhythm ? 'rhythm' : p.endOnSilence ? 'breath' : 'windows' };
       });
       await page.waitForTimeout(Math.min(info.dur * 0.6, 7) * 1000);
       if (!shots[info.kind]) { await shot(`10-toma-${info.kind}`); shots[info.kind] = true; }
@@ -273,7 +294,7 @@ await page.evaluate(async () => {
   localStorage.setItem('catarsis.v1', JSON.stringify(st));
 });
 await page.reload();
-const TOUR = (process.env.TOUR ?? 'Vocal fry: la semilla del scream|Ritmo de breakdown|Coro que levanta|Limpio, scream, limpio|Graves, medios y agudos').split('|');
+const TOUR = (process.env.TOUR ?? 'Vocal fry: la semilla del scream|El interruptor|Voz mixta|Ritmo de breakdown|Coro que levanta|Limpio, scream, limpio|Graves, medios y agudos').split('|');
 for (const name of TOUR) {
   await page.getByRole('button', { name: 'Ruta' }).first().click();
   await page.locator('.lesson-row', { hasText: name }).click();

@@ -40,7 +40,7 @@ La voz es coordinación muscular: se asienta con repetición espaciada y sueño,
 - **Etapas que se ganan.** Una etapa se abre cuando la anterior tiene sus lecciones aprobadas y un grado promedio de 2, es decir, repasadas en días distintos.
 - **Después de las lecciones:** un gimnasio de ejercicios que se abre por etapa, un "riff del día" generado (distinto cada día) y tu repertorio de canciones.
 
-En simulación, alguien que practica todos los días con puntajes perfectos termina las 25 lecciones en unas 5 semanas; con puntajes normales, en unas 7. Llevar todo a grado 5 toma varios meses.
+En simulación, alguien que practica todos los días con puntajes perfectos termina las 26 lecciones en unas 5 o 6 semanas; con puntajes normales, en unas 8. Llevar todo a grado 5 toma varios meses.
 
 ## Canciones reales (YouTube Music)
 
@@ -56,12 +56,35 @@ Con la canción puedes repetir un tramo (verso, coro, puente), bajar la velocida
 
 Notas prácticas: necesitas audífonos (si la canción suena por la bocina, el micrófono la oye). Algunos videos no permiten reproducirse fuera de YouTube: prueba otra versión de la misma canción. En teléfonos, el primer play hay que darlo tocando dentro del video. Si tienes YouTube Premium y sesión iniciada en ese navegador, normalmente no salen anuncios.
 
+## Registros: voz llena, ligera, mezcla y belt
+
+Cambiar entre voz de pecho, cabeza, mezcla y belt es lo que más cuesta, así que tiene su propia línea de lecciones con la explicación física (qué hacen las cuerdas vocales en cada modo y por qué se "quiebra" la voz) y ejercicios específicos:
+
+- **Llena abajo, ligera arriba** y **El interruptor**: la misma nota cantada con tus dos voces.
+- **Salto con cambio** (yodel): voltear la voz a propósito para sentir dónde ocurre.
+- **Tres voces, una nota**: llena, ligera y mezcla en la misma altura.
+- **Sirena sin escalón**: cruzar de un registro al otro sin que se note.
+
+**Cómo sabe la app en qué registro estás.** Mide el "peso" de tu voz: cuánta energía tienen los armónicos superiores frente a la nota base. En voz llena las cuerdas chocan con todo su cuerpo y producen muchos armónicos fuertes; en voz ligera solo vibra el borde y queda casi solo la fundamental. Tu línea se pinta naranja cuando suena llena y azul cuando suena ligera, y hay un medidor en vivo.
+
+Los ejercicios no usan un número fijo: comparan **tus dos voces entre sí** en la misma nota (la mezcla debe quedar entre ambas, y en la sirena el peso debe cambiar poco a poco). Es una estimación acústica que depende de la vocal y del micrófono; no ve tu laringe.
+
+## Canciones con la TV o una bocina
+
+Lo más preciso es que la canción suene en audífonos. Si prefieres que suene en la TV:
+
+1. En el iPad o el teléfono abre la app de YouTube, toca el ícono de transmitir y elige tu TV (misma red wifi). Si no aparece, en la TV abre YouTube → Configuración → "Vincular con código de TV" y escribe ese código en el iPad.
+2. En Catarsis, abre la canción, elige **"En la TV o una bocina"** y calibra 3 segundos con la canción sonando y sin cantar.
+3. Canta con el iPad a un palmo de tu boca y la TV a volumen medio.
+
+La app sube su umbral para contar solo lo que suena más fuerte que la música en el micrófono (tu voz de cerca). Los ejercicios de la Ruta conviene hacerlos con el audio del propio iPad: mandar ese audio a la TV mete retraso y desincroniza la guía.
+
 ## Qué corrige
 
 | Área | Cómo te corrige |
 | --- | --- |
 | **Afinación** | Tu voz es una línea que tiene que entrar en las barras. Al terminar te dice si quedaste bajo o alto, si la nota tiembla, si entras arrastrándote desde abajo, si se cae al final por falta de aire, o si fallas solo en las notas altas. |
-| **Rango y registros** | Sirenas y trinos adaptados a tu rango. Detecta quiebres de voz y te dice en qué nota está tu zona de paso. El rango de trabajo crece solo cuando demuestras que llegas más arriba. |
+| **Rango y registros** | Sirenas y trinos adaptados a tu rango. Detecta quiebres de voz y te dice en qué nota está tu zona de paso. Mide si de verdad cambiaste de voz llena a ligera y si tu mezcla queda entre las dos. El rango de trabajo crece solo cuando demuestras que llegas más arriba. |
 | **Aire** | Mide cuántos segundos sostienes un "sss" parejo y qué tan estable sale. |
 | **Guturales** | Detecta distorsión (fry, false cord, scream), cuánto la sostienes y si estás empujando volumen de más. Distingue colores graves, medios y agudos por el brillo del sonido. |
 | **Ritmo** | Compara tus ataques con el patrón del breakdown y descuenta el retraso constante del micrófono. |

@@ -105,8 +105,8 @@ function pitchPlan(def, profile, opts) {
         notes.push({ midi: rr + src[0][0], t0: t, t1: t + 0.7, seg: 'listen', rep });
         t += 0.7;
       } else {
-        for (const [semi, beats, text] of src) {
-          notes.push({ midi: rr + semi, t0: t, t1: t + beats * beat, text, seg: 'listen', rep });
+        for (const [semi, beats, text, reg] of src) {
+          notes.push({ midi: rr + semi, t0: t, t1: t + beats * beat, text, reg, seg: 'listen', rep });
           t += beats * beat;
         }
       }
@@ -114,8 +114,8 @@ function pitchPlan(def, profile, opts) {
       t += 0.5;
     }
     const s0 = t;
-    for (const [semi, beats, text] of src) {
-      notes.push({ midi: rr + semi, t0: t, t1: t + beats * beat, text, seg: 'sing', rep });
+    for (const [semi, beats, text, reg] of src) {
+      notes.push({ midi: rr + semi, t0: t, t1: t + beats * beat, text, reg, seg: 'sing', rep });
       t += beats * beat;
     }
     segs.push({ type: 'sing', t0: s0, t1: t, rep, root: rr });
@@ -136,6 +136,7 @@ function pitchPlan(def, profile, opts) {
     hi: Math.max(...all) + 4,
     tol: tolerance(def, opts),
     dyn: def.dyn ?? null,
+    reg: notes.some((n) => n.reg), // ejercicio de registros: se compara el "peso" entre notas
     vibrato: !!def.vibrato,
     bpm,
     root,
@@ -173,6 +174,7 @@ function slidePlan(def, profile) {
     lo: Math.min(a, b) - 4,
     hi: Math.max(a, b) + 4,
     slide: { lo: Math.min(a, b), hi: Math.max(a, b) },
+    connect: !!def.connect, // además de llegar, hay que cruzar de registro sin escalón
     tol: 100,
     dyn: null,
     bpm: 60,

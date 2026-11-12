@@ -220,3 +220,69 @@ test('ritmo: golpes a tiempo, con retraso constante, y desordenados', () => {
   const none = scoreTake(plan, makeFrames(plan.dur, () => null));
   assert.equal(none.score, 0);
 });
+
+test('registros: misma nota con voz llena y ligera; si suenan igual, lo detecta', () => {
+  const step = stepById('registro-cambio:3');
+  const plan = buildPlan(step, profile, {});
+  assert.equal(plan.reg, true);
+  const sing = plan.notes.filter((n) => n.seg === 'sing');
+  assert.ok(sing.every((n) => n.reg && n.midi === sing.find((x) => x.rep === n.rep).midi), 'en cada repetición, todas las notas a la misma altura');
+  assert.ok(sing[0].midi >= profile.low + 9 && sing[0].midi <= profile.high - 3, 'en la zona media, donde caben las dos voces');
+  const take = (wOf) => singPlan(plan).map((f) => {
+    const n = sing.find((x) => f.t >= x.t0 && f.t < x.t1);
+    return { ...f, weight: n ? wOf(n.reg) : null };
+  });
+  const good = scoreTake(plan, take((r) => (r === 'chest' ? 6 : -8)));
+  assert.ok(good.score >= 95, `score ${good.score}`);
+  assert.ok(good.stats.regDiff > 10);
+  const same = scoreTake(plan, take(() => 5));
+  assert.ok(same.diag.includes('regSame'));
+  assert.ok(same.score < 55, `score ${same.score}`);
+  assert.equal(same.tips[0].code, 'regSame');
+  const flipped = scoreTake(plan, take((r) => (r === 'chest' ? -8 : 6)));
+  assert.ok(flipped.diag.includes('regFlip'));
+  const noData = scoreTake(plan, singPlan(plan));
+  assert.ok(noData.diag.includes('regUnknown'));
+});
+
+test('mezcla: debe quedar entre tu voz llena y tu voz ligera', () => {
+  const plan = buildPlan(stepById('registro-2:5'), profile, {});
+  const sing = plan.notes.filter((n) => n.seg === 'sing');
+  assert.ok(sing.some((n) => n.reg === 'mix'));
+  const take = (mix) => singPlan(plan).map((f) => {
+    const n = sing.find((x) => f.t >= x.t0 && f.t < x.t1);
+    return { ...f, weight: n ? { chest: 7, head: -7, mix }[n.reg] : null };
+  });
+  assert.ok(scoreTake(plan, take(2)).score >= 95);
+  const light = scoreTake(plan, take(-6.5));
+  assert.ok(light.diag.includes('mixLight'));
+  const heavy = scoreTake(plan, take(8));
+  assert.ok(heavy.diag.includes('mixHeavy'));
+  assert.ok(heavy.score < 90 && light.score < 90);
+});
+
+test('cruce sin escalón: un cambio brusco de peso se marca', () => {
+  const plan = buildPlan(stepById('registro-3:3'), profile, {});
+  assert.equal(plan.connect, true);
+  const path = (t) => {
+    const p = plan.paths.find((x) => t >= x.t0 && t < x.t1);
+    if (!p) return null;
+    for (let i = 0; i < p.pts.length - 1; i++) {
+      const [ta, ma] = p.pts[i];
+      const [tb, mb] = p.pts[i + 1];
+      if (t >= ta && t <= tb) return ma + ((mb - ma) * (t - ta)) / (tb - ta);
+    }
+    return null;
+  };
+  const mid = (plan.slide.lo + plan.slide.hi) / 2;
+  const frames = (wOf) => makeFrames(plan.dur, (t) => (path(t) == null ? null : { midi: path(t) })).map((f) => ({ ...f, weight: f.voiced ? wOf(f.midi) : null }));
+  // Peso que baja poco a poco al subir: bien
+  const smooth = scoreTake(plan, frames((m) => 8 - ((m - plan.slide.lo) / (plan.slide.hi - plan.slide.lo)) * 16));
+  assert.ok(smooth.score >= 92, `score ${smooth.score}`);
+  assert.ok(!smooth.diag.includes('regStep'));
+  // Peso que cae de golpe a media sirena: escalón
+  const step = scoreTake(plan, frames((m) => (m < mid ? 8 : -8)));
+  assert.ok(step.diag.includes('regStep'), step.diag.join());
+  assert.ok(step.stats.stepNote);
+  assert.ok(step.score < smooth.score - 10);
+});

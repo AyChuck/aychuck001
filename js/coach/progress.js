@@ -13,7 +13,7 @@ import { starsFor } from './scoring.js';
 export const SKILLS = {
   breath: 'Aire',
   pitch: 'Afinación',
-  range: 'Rango',
+  range: 'Registros y rango',
   power: 'Potencia',
   harsh: 'Guturales',
   rhythm: 'Ritmo',
@@ -38,7 +38,7 @@ export function defaultState() {
     v: 2,
     onboarded: false,
     profile: { goal: 'both', exp: 'new', low: 45, high: 64, firstLow: null, firstHigh: null, refDb: null, gate: 0.012, tested: false },
-    settings: { headphones: false, guide: true, strict: 1, sfx: true, grit: 1 },
+    settings: { headphones: false, guide: true, strict: 1, sfx: true, grit: 1, room: false, roomGate: null },
     xp: 0,
     days: {},
     ex: {},
@@ -53,6 +53,7 @@ export function defaultState() {
     songs: {},
     focusSong: null,
     taste: ['posthc', 'punk', 'metal', 'core', 'es'],
+    heroes: ['Sleep Token', 'Falling in Reverse', 'Bad Omens'], // referentes de técnica
   };
 }
 

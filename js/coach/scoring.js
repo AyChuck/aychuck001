@@ -168,6 +168,39 @@ function scorePitch(plan, frames, ctx) {
     if (ok < 0.5) diag.push(plan.dyn === 'soft' ? 'notSoft' : 'notLoud');
   }
 
+  // Registros: compara el peso de tu voz llena contra tu voz ligera (y la mezcla entre las dos)
+  if (plan.reg) {
+    const by = { chest: [], head: [], mix: [] };
+    for (const n of notes) {
+      if (!n.reg) continue;
+      const ws = frames.filter((f) => f.voiced && f.weight != null && f.t >= n.t0 + (n.t1 - n.t0) * 0.3 && f.t < n.t1).map((f) => f.weight);
+      if (ws.length >= 4) by[n.reg].push(mean(ws));
+    }
+    if (by.chest.length && by.head.length) {
+      const C = mean(by.chest);
+      const H = mean(by.head);
+      const diff = C - H;
+      const sw = clamp((diff - 1.5) / 4.5, 0, 1);
+      stats.regDiff = +diff.toFixed(1);
+      parts.push({ label: 'Cambio de registro', value: Math.round(sw * 100) });
+      let reg = sw;
+      if (diff < -2) diag.push('regFlip');
+      else if (sw < 0.5) diag.push('regSame');
+      if (by.mix.length) {
+        const pos = diff >= 2 ? (mean(by.mix) - H) / diff : null;
+        const mx = pos == null ? 0.4 : pos >= 0.25 && pos <= 0.9 ? 1 : pos < 0.25 ? clamp(pos / 0.25, 0, 1) : clamp(1 - (pos - 0.9) / 0.25, 0, 1);
+        parts.push({ label: 'Mezcla', value: Math.round(mx * 100) });
+        reg = sw * 0.6 + mx * 0.4;
+        if (pos != null && pos < 0.25) diag.push('mixLight');
+        if (pos != null && pos > 0.9) diag.push('mixHeavy');
+      }
+      score = score * 0.45 + reg * 55;
+    } else if (voicedFrac >= 0.25) {
+      diag.push('regUnknown');
+      score = Math.min(score, 70);
+    }
+  }
+
   // Vibrato
   if (plan.vibrato && longNotes.length) {
     const v = longNotes.map((x) => vibrato(x)).filter(Boolean);
@@ -240,11 +273,36 @@ function scoreSlide(plan, frames) {
   const reachLo = mids.length ? clamp(1 - Math.max(0, bottom - lo - 0.7) / 4, 0, 1) : 0;
   const reach = (reachHi + reachLo) / 2;
   const smooth = clamp(1 - breaks / (2 * plan.segs.length + 1), 0, 1);
-  const score = 100 * (0.45 * reach + 0.4 * Math.min(1, cont / 0.8) + 0.15 * smooth);
+  let score = 100 * (0.45 * reach + 0.4 * Math.min(1, cont / 0.8) + 0.15 * smooth);
+
+  // Cruce de registro: el peso de la voz debe cambiar poco a poco, no de golpe
+  let steps = 0;
+  let stepAt = [];
+  let weighed = 0;
+  if (plan.connect) {
+    for (const s of plan.segs) {
+      const fs = frames.filter((f) => f.t >= s.t0 && f.t < s.t1 && f.voiced && f.weight != null);
+      weighed += fs.length;
+      let last = -1;
+      for (let i = 0; i < fs.length; i++) {
+        // contra el cuadro de ~0.15 s antes
+        let j = i;
+        while (j > 0 && fs[i].t - fs[j].t < 0.15) j--;
+        if (fs[i].t - fs[j].t < 0.3 && Math.abs(fs[i].weight - fs[j].weight) > 7 && fs[i].t - last > 0.6) {
+          steps++;
+          stepAt.push(fs[i].midi);
+          last = fs[i].t;
+        }
+      }
+    }
+  }
+  const even = clamp(1 - (steps + breaks) / (plan.segs.length * 2), 0, 1);
+  if (plan.connect && weighed > 10) score = score * 0.7 + even * 30;
 
   if (cont < 0.25) diag.push('noVoice');
   else {
     if (breaks >= plan.segs.length) diag.push('breaks');
+    else if (plan.connect && steps >= plan.segs.length) diag.push('regStep');
     if (reachHi < 0.6) diag.push('shortHigh');
     if (reachLo < 0.6) diag.push('shortLow');
     if (cont < 0.6) diag.push('gaps');
@@ -253,11 +311,12 @@ function scoreSlide(plan, frames) {
   return {
     score,
     diag,
-    stats: { top, bottom, breaks, breakNote: breakAt.length ? midiName(median(breakAt)) : null },
+    stats: { top, bottom, breaks, steps, breakNote: breakAt.length ? midiName(median(breakAt)) : null, stepNote: stepAt.length ? midiName(median(stepAt)) : null },
     parts: [
       { label: 'Recorrido', value: Math.round(reach * 100) },
       { label: 'Continuidad', value: Math.round(Math.min(1, cont / 0.8) * 100) },
       { label: 'Sin quiebres', value: Math.round(smooth * 100) },
+      ...(plan.connect && weighed > 10 ? [{ label: 'Cruce sin escalón', value: Math.round(even * 100) }] : []),
     ],
   };
 }
@@ -488,12 +547,18 @@ const TIPS = {
   missedHits: ['Faltaron golpes', 'Sigue el pulso con el cuerpo (cabeza o pie) y marca cada sílaba corta y seca: "¡ha!".'],
   timingLoose: ['El ritmo quedó suelto', 'Cuenta en voz baja "1 y 2 y" durante la guía. Los golpes cortos son más fáciles de clavar.'],
   extraHits: ['Hubo golpes de más', 'Solo en las marcas. Respira por la boca en los silencios.'],
+  regSame: ['Las dos voces sonaron casi igual', 'Exagera la diferencia. Ligera: la mitad de volumen, bostezo por dentro, "uu" de búho y un poco de aire. Llena: di la nota como si hablaras, "¡ey!", firme y sin aire. Tu línea debe cambiar de color.'],
+  regFlip: ['Salieron al revés', 'Donde dice "llena" va tu voz de hablar, con cuerpo. Donde dice "ligera" va la de búho, suave y con aire.'],
+  regUnknown: ['No alcancé a medir tu registro', 'Sostén cada nota completa con una vocal abierta ("ah") para que pueda comparar las dos voces.'],
+  mixLight: ['Tu mezcla quedó casi en voz ligera', 'Súmale cierre: sonido nasal y burlón de "nei", sin aire, como si te quejaras. Mismo volumen bajo.'],
+  mixHeavy: ['Tu mezcla es voz llena empujada', 'Baja el volumen un 30 % y adelgaza el sonido: piensa la nota más pequeña y brillante, no más fuerte.'],
+  regStep: ['Hay un escalón al cambiar de voz', (s) => `Tu voz cambia de golpe${s.stepNote ? ` cerca de ${s.stepNote}` : ''}. Justo antes de esa zona baja el volumen y deja que la voz adelgace poco a poco; no esperes a que "truene".`],
   great: ['Clavado', 'Así suena cuando todo se alinea. Recuerda la sensación en el cuerpo.'],
 };
 
 const PRIORITY = [
   'noVoice', 'noSound', 'octaveLow', 'octaveHigh', 'tooLoud', 'fryLoud', 'tooClean', 'harshShort', 'cleanDirty', 'placeSame',
-  'breaks', 'highMiss', 'lowMiss', 'flat', 'sharp', 'dropEnd', 'scoop', 'unstable', 'late', 'notSoft', 'notLoud',
+  'regFlip', 'regSame', 'regUnknown', 'mixLight', 'mixHeavy', 'breaks', 'regStep', 'highMiss', 'lowMiss', 'flat', 'sharp', 'dropEnd', 'scoop', 'unstable', 'late', 'notSoft', 'notLoud',
   'noVibrato', 'vibFast', 'vibSlow', 'vibWide', 'shortHigh', 'shortLow', 'gaps', 'breathShort', 'breathUnsteady',
   'missedHits', 'timingLoose', 'extraHits', 'great',
 ];

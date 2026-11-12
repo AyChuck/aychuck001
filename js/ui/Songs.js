@@ -1,17 +1,17 @@
 // Canciones: tu repertorio, sugerencias según tus gustos y práctica sobre la canción real.
 
 import { html, useState, useEffect, useRef, useMemo } from '../lib.js';
-import { Icon, Canvas, Bar } from './common.js';
+import { Icon, Canvas, Bar, Choice } from './common.js';
 import { drawPitch } from './rolls.js';
 import { CATALOG, SCENES, TAGS, LEVELS } from '../content/songs.js';
 import { lessonById } from '../content/curriculum.js';
-import { analyzeTake, songStatus, songMeta, songReady, recommend, goodDays, MASTER_DAYS, MASTER_SCORE } from '../coach/songs.js';
+import { analyzeTake, songStatus, songMeta, songReady, recommend, heroPicks, isHero, goodDays, MASTER_DAYS, MASTER_SCORE } from '../coach/songs.js';
 import { harshBlocked } from '../coach/progress.js';
 import { parseLink, createPlayer, readPlaylist, fetchTitle, musicSearchUrl } from '../audio/youtube.js';
 import { startMic, stopMic, onFrame, audioCtx, unlockAudio, getStream, setGate, setGritSensitivity } from '../audio/engine.js';
 import { sfx } from '../audio/synth.js';
 import { midiName } from '../music/notes.js';
-import { useStore, getState, addSongToRepertoire, updateSong, deleteSong, saveSongTake, setFocusSong, setTaste } from '../store.js';
+import { useStore, getState, addSongToRepertoire, updateSong, deleteSong, saveSongTake, setFocusSong, setTaste, patchSettings } from '../store.js';
 
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 const STATUS = { nueva: 'Nueva', trabajo: 'En trabajo', dominada: 'Dominada' };
@@ -91,7 +91,7 @@ function CatalogRow({ song, state, onAdd }) {
   const { ready, missing } = songReady(state, song);
   return html`<li class="song-row">
     <button class="song-main" aria-expanded=${open} onClick=${() => setOpen(!open)}>
-      <span class="song-text"><b>${song.title}</b><small>${song.artist}</small></span>
+      <span class="song-text"><b>${song.title}</b><small>${song.artist}${isHero(state, song.artist) ? ' · tu referente' : ''}</small></span>
       <${Level} n=${song.level} />
     </button>
     ${open &&
@@ -114,6 +114,7 @@ function Library({ onOpen, go }) {
   const [q, setQ] = useState('');
   const mine = Object.values(s.songs).sort((a, b) => (b.takes.at(-1)?.ts ?? b.added) - (a.takes.at(-1)?.ts ?? a.added));
   const recs = useMemo(() => recommend(s, 6), [s.songs, s.taste, s.ex, s.profile.goal]);
+  const heroes = useMemo(() => heroPicks(s, 4), [s.songs, s.ex, s.heroes]);
   const addCat = (song) => onOpen(addSongToRepertoire({ cat: song.id, title: song.title, artist: song.artist }));
 
   const needle = q.trim().toLowerCase();
@@ -145,6 +146,13 @@ function Library({ onOpen, go }) {
       <p class="muted small">Según tus escenas, tu etapa y la técnica que ya viste. Cambian cada día.</p>
       <ul class="songs">${recs.map((x) => html`<${CatalogRow} key=${x.id} song=${x} state=${s} onAdd=${addCat} />`)}</ul>
     </section>
+
+    ${heroes.length > 0 &&
+    html`<section class="panel">
+      <div class="panel-head"><h2>De tus referentes</h2></div>
+      <p class="muted small">${s.heroes.join(', ')}: los que usas como modelo de técnica. Primero escúchalas fijándote en qué voz usan en cada frase; cántalas cuando la app diga que ya tienes la técnica.</p>
+      <ul class="songs">${heroes.map((x) => html`<${CatalogRow} key=${x.id} song=${x} state=${s} onAdd=${addCat} />`)}</ul>
+    </section>`}
 
     <${AddLink} onOpen=${onOpen} />
 
@@ -230,6 +238,8 @@ function SongView({ id, onBack }) {
   const [micErr, setMicErr] = useState(null);
   const [confirmDel, setConfirmDel] = useState(false);
   const [needTap, setNeedTap] = useState(false);
+  const [cal, setCal] = useState(null); // null | 'run' | 'ok' | 'loud'
+  const room = !!s.settings.room;
   const frames = useRef([]);
   const t0 = useRef(0);
   const view = useRef({ lo: s.profile.low - 4, hi: s.profile.high + 6 });
@@ -310,7 +320,9 @@ function SongView({ id, onBack }) {
     setTimeout(() => player.current && !player.current.playing() && setNeedTap(true), 1600);
   };
 
-  const startTake = async () => {
+  // Con la canción sonando por bocina o TV: mide cuánto de la música llega al micrófono
+  // y sube la puerta de ruido para que solo cuente tu voz (que está más cerca).
+  const calibrateRoom = async () => {
     setMicErr(null);
     try {
       await unlockAudio();
@@ -319,12 +331,39 @@ function SongView({ id, onBack }) {
       setMicErr(e.message);
       return;
     }
+    setCal('run');
+    const vals = [];
+    const off = onFrame((f) => vals.push(f.rms));
+    await new Promise((r) => setTimeout(r, 3000));
+    off();
+    stopMic();
+    vals.sort((a, b) => a - b);
+    const p95 = vals.length ? vals[Math.floor(vals.length * 0.95)] : 0.01;
+    patchSettings({ roomGate: Math.min(0.3, Math.max(getState().profile.gate, p95 * 2.2)) });
+    setCal(p95 > 0.11 ? 'loud' : 'ok');
+  };
+
+  const startTake = async () => {
+    setMicErr(null);
+    if (getState().settings.room && !getState().settings.roomGate) {
+      setMicErr('Primero calibra con la canción sonando (botón de arriba).');
+      return;
+    }
+    try {
+      await unlockAudio();
+      await startMic();
+    } catch (e) {
+      setMicErr(e.message);
+      return;
+    }
     const st = getState();
-    setGate(st.profile.gate);
+    const inRoom = !!st.settings.room;
+    setGate(inRoom ? Math.max(st.profile.gate, st.settings.roomGate) : st.profile.gate);
     setGritSensitivity(st.settings.grit ?? 1);
     frames.current = [];
     t0.current = audioCtx().currentTime;
-    offFrame.current = onFrame((f) => frames.current.push({ t: f.t - t0.current, midi: f.midi, voiced: f.voiced, kind: f.kind, db: f.db, grit: f.grit, clarity: f.clarity }));
+    // Con música en el cuarto solo cuentan los cuadros con tono muy claro
+    offFrame.current = onFrame((f) => frames.current.push({ t: f.t - t0.current, midi: f.midi, voiced: f.voiced && (!inRoom || f.clarity >= 0.8), kind: f.kind, db: f.db, grit: f.grit, clarity: f.clarity, weight: f.weight }));
     if (audio) URL.revokeObjectURL(audio);
     setAudio(null);
     if (window.MediaRecorder) {
@@ -375,7 +414,7 @@ function SongView({ id, onBack }) {
         v.hi += d;
       }
     }
-    drawPitch(g, w, h, { plan: null, frames: fs.slice(-600), now: t, ...view.current });
+    drawPitch(g, w, h, { plan: null, frames: fs.slice(-600), now: t, byWeight: true, ...view.current });
   };
 
   const p = player.current;
@@ -435,10 +474,21 @@ function SongView({ id, onBack }) {
             <button class="btn primary" type="submit" disabled=${!link.trim()}>Guardar</button>
           </form>
           ${linkErr && html`<p class="note warn">${linkErr}</p>`}
-          <p class="muted small">O ponla en tu app de música con audífonos y graba la toma aquí abajo.</p>
+          <p class="muted small"><b>¿En la TV?</b> Ábrela en la app de YouTube del iPad o del teléfono, toca el ícono de transmitir y elige tu TV. No hace falta pegar enlace: graba la toma aquí abajo mientras suena.</p>
         </section>`}
 
-    ${!s.settings.headphones && html`<p class="note warn">Para cantar sobre la canción necesitas audífonos. Si suena por la bocina, el micrófono la oye y el análisis no sirve.</p>`}
+    <section class="panel">
+      <div class="panel-head"><h2>¿Dónde suena la canción?</h2></div>
+      <${Choice} value=${room ? 'room' : 'phones'} onPick=${(v) => patchSettings({ room: v === 'room' })} options=${[
+        { id: 'phones', title: 'En audífonos', sub: 'Lo más preciso: el micrófono solo te oye a ti' },
+        { id: 'room', title: 'En la TV o una bocina', sub: 'Funciona, con menos precisión. Hay que calibrar' },
+      ]} />
+      ${room &&
+      html`<p class="muted small">Pon la canción en su parte más fuerte, <b>sin cantar</b>, y calibra. Luego canta con el micrófono a un palmo de tu boca y la TV a volumen medio, de preferencia a tu espalda.</p>
+        <button class="btn ghost" disabled=${cal === 'run' || taking} onClick=${calibrateRoom}>${cal === 'run' ? 'Midiendo… no cantes' : s.settings.roomGate ? 'Volver a calibrar (3 s)' : 'Calibrar con la canción sonando (3 s)'}</button>
+        ${cal === 'ok' && html`<p class="note" role="status">Listo. Ahora solo cuenta lo que suene más fuerte que la música en tu micrófono: tu voz de cerca.</p>`}
+        ${cal === 'loud' && html`<p class="note warn" role="status">La música llega muy fuerte al micrófono. Baja el volumen de la TV o aléjate de la bocina y vuelve a calibrar.</p>`}`}
+    </section>
     ${hasScream && blocked && html`<p class="note warn">Hoy tus guturales están en pausa. Canta solo las partes limpias.</p>`}
 
     ${taking
@@ -455,6 +505,7 @@ function SongView({ id, onBack }) {
       <ul class="focus">
         ${meta.tags.map((t) => html`<li><b>${TAGS[t].name}.</b> ${TAGS[t].tip}</li>`)}
       </ul>
+      ${isHero(s, meta.artist) && html`<p class="listen-hint"><b>Es de tus referentes.</b> Antes de cantarla, escucha un tramo completo sin cantar y anota mentalmente en qué voz va cada frase: ligera, llena, mezcla o grito.</p>`}
       <p class="muted small">Trabaja por tramos: primero el coro a 0.75x, luego a velocidad normal, y al final la canción completa.</p>
     </section>`}
 

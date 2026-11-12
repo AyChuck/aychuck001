@@ -356,6 +356,17 @@ textarea { width: 100%; border-radius: 10px; border: 1px solid var(--line); back
 .tile.wide { width: 100%; }
 .pill.ok { background: var(--ok); color: #06210f; }
 
+/* ───── Registros ───── */
+.weight { display: flex; flex-direction: column; gap: 4px; }
+.weight-track { position: relative; height: 12px; border-radius: 99px; background: linear-gradient(90deg, var(--ice), #b79fb0 50%, var(--ember)); opacity: 0.9; }
+.weight-track i { position: absolute; top: -5px; width: 8px; height: 22px; margin-left: -4px; border-radius: 4px; background: var(--fg); box-shadow: 0 0 0 2px var(--bg); transition: left 0.1s linear; }
+.weight-track i.off { opacity: 0.25; }
+.weight-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.weight-labels span:nth-child(2) { color: var(--fg); font-weight: 700; }
+.hud.chest .hud-label { color: var(--ember); }
+.hud.head .hud-label { color: var(--ice); }
+.hud.mix .hud-label { color: #d9a9a0; }
+
 /* ───── Canciones ───── */
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 input[type='url'], input[type='search'] { width: 100%; min-width: 0; min-height: 46px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; }

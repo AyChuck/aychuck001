@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseLink } from '../js/audio/youtube.js';
 import { CATALOG, SCENES, TAGS, LEVELS } from '../js/content/songs.js';
 import { LESSONS } from '../js/content/curriculum.js';
-import { analyzeTake, segmentNotes, addSong, removeSong, recordSongTake, songStatus, recommend, songReady, tier } from '../js/coach/songs.js';
+import { analyzeTake, segmentNotes, addSong, removeSong, recordSongTake, songStatus, recommend, songReady, tier, heroPicks } from '../js/coach/songs.js';
 import { defaultState, record } from '../js/coach/progress.js';
 
 const DAY = 86400000;
@@ -171,4 +171,21 @@ test('recomendaciones: al inicio, canciones accesibles y variadas; crecen con tu
   assert.ok(recommend(s, 8, 20500).some((x) => x.level >= 4));
   assert.equal(songReady(s, CATALOG.find((x) => x.title === 'The Summoning')).ready, true);
   assert.equal(songReady(s0, CATALOG.find((x) => x.title === 'The Summoning')).ready, false);
+});
+
+test('tus referentes: siempre a la vista, y suben en las sugerencias cuando ya tienes la técnica', () => {
+  const s0 = defaultState();
+  assert.deepEqual(s0.heroes, ['Sleep Token', 'Falling in Reverse', 'Bad Omens']);
+  const picks = heroPicks(s0, 6);
+  assert.equal(picks.length, 6);
+  assert.deepEqual(new Set(picks.slice(0, 3).map((x) => x.artist)), new Set(s0.heroes));
+  assert.ok(picks[0].level <= 3);
+  assert.ok(CATALOG.find((x) => x.title === 'The Summoning').tags.includes('registros'));
+  assert.ok(CATALOG.filter((x) => x.tags.includes('registros')).length >= 15);
+  // Con el curso avanzado, los referentes dominan las sugerencias
+  let s = defaultState();
+  for (let d = 0; d < 3; d++) for (const l of LESSONS) for (const st of l.steps) s = record(s, st.id, { score: 95, stars: 3 }, T0 + d * DAY).state;
+  let hits = 0;
+  for (let d = 20500; d < 20520; d++) if (recommend(s, 6, d).some((x) => s.heroes.includes(x.artist))) hits++;
+  assert.ok(hits >= 18, `solo ${hits} de 20 días`);
 });

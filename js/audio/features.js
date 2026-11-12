@@ -91,6 +91,49 @@ export function createAnalyzer(sampleRate, size) {
 
 export const toDb = (rms) => 20 * Math.log10(Math.max(rms, 1e-7));
 
+/**
+ * "Peso" de la voz: cuánta energía tienen los armónicos superiores frente a la nota base.
+ * Es la huella acústica del registro:
+ *  - voz llena (pecho, belt): las cuerdas chocan con todo su cuerpo → muchos armónicos fuertes → peso alto
+ *  - voz ligera (cabeza, falsete): solo vibra el borde → casi solo la fundamental → peso bajo
+ * Devuelve dB (aprox. de -20 a +15). Depende de la vocal y del micrófono, por eso
+ * los ejercicios comparan tus dos voces entre sí y no contra un número fijo.
+ */
+export function createWeightMeter(sampleRate, size) {
+  const hann = new Float32Array(size);
+  for (let i = 0; i < size; i++) hann[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (size - 1));
+  return function weight(buf, f0) {
+    if (!(f0 > 50)) return null;
+    const K = Math.max(3, Math.min(8, Math.floor(4000 / f0))); // armónicos por debajo de 4 kHz
+    let h1 = 0;
+    let rest = 0;
+    for (let k = 1; k <= K; k++) {
+      const w = (2 * Math.PI * k * f0) / sampleRate;
+      const cw = Math.cos(w);
+      const sw = Math.sin(w);
+      let c = 1;
+      let s = 0;
+      let re = 0;
+      let im = 0;
+      for (let n = 0; n < size; n++) {
+        const x = buf[n] * hann[n];
+        re += x * c;
+        im -= x * s;
+        const c2 = c * cw - s * sw;
+        s = s * cw + c * sw;
+        c = c2;
+      }
+      const p = re * re + im * im;
+      if (k === 1) h1 = p;
+      else rest += p;
+    }
+    return Math.max(-30, Math.min(30, 10 * Math.log10((rest + 1e-12) / (h1 + 1e-12))));
+  };
+}
+
+/** Peso en dB → índice 0 (muy ligera) a 1 (muy llena), para medidores y colores. */
+export const weightIndex = (db) => (db == null ? null : Math.max(0, Math.min(1, (db + 12) / 22)));
+
 /** Índice de distorsión 0..1 a partir de la claridad del tono. */
 export const gritFrom = (clarity) => Math.max(0, Math.min(1, (0.9 - clarity) / 0.45));
 

@@ -2,7 +2,7 @@
 // Emite ~60 cuadros por segundo con tono, claridad, volumen y tipo de sonido.
 
 import { createYin } from './pitch.js';
-import { createAnalyzer, classify, gritFrom } from './features.js';
+import { createAnalyzer, createWeightMeter, classify, gritFrom } from './features.js';
 import { freqToMidi } from '../music/notes.js';
 
 const SIZE = 2048;
@@ -15,6 +15,8 @@ let buf = null;
 let bytes = null;
 let yin = null;
 let analyze = null;
+let weigh = null;
+let weightEma = null;
 let raf = 0;
 let gate = 0.012;
 const listeners = new Set();
@@ -84,6 +86,7 @@ export async function startMic() {
   buf = new Float32Array(SIZE);
   yin = createYin(c.sampleRate, SIZE);
   analyze = createAnalyzer(c.sampleRate, SIZE);
+  weigh = createWeightMeter(c.sampleRate, SIZE);
   recent.length = 0;
   loop();
 }
@@ -131,6 +134,15 @@ function loop() {
     if (recent.length === 3) midi = [...recent].sort((a, b) => a - b)[1];
   } else recent.length = 0;
   f.midi = midi;
+  // Peso de la voz (registro), suavizado para que no brinque
+  if (f.voiced && p.clarity >= 0.75) {
+    const w = weigh(buf, p.freq);
+    weightEma = weightEma == null ? w : weightEma * 0.65 + w * 0.35;
+    f.weight = weightEma;
+  } else {
+    weightEma = null;
+    f.weight = null;
+  }
   f.kind = classify(f, gate, cleanMin);
   f.grit = f.kind === 'silence' || f.kind === 'hiss' ? 0 : gritFrom(p.clarity);
   for (const fn of listeners) fn(f);

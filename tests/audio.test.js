@@ -59,3 +59,28 @@ test('nombres de nota y tipo de voz', () => {
   assert.equal(voiceType(40, 64), 'Barítono');
   assert.equal(voiceType(48, 72), 'Contralto');
 });
+
+test('peso de la voz: distingue voz llena de voz ligera en la misma nota', async () => {
+  const { createWeightMeter, weightIndex } = await import('../js/audio/features.js');
+  const meter = createWeightMeter(SR, N);
+  // Fuente glotal sintética: armónicos que decaen despacio (llena) o rápido (ligera)
+  const tone = (f0, tilt) => {
+    const b = new Float32Array(N);
+    for (let i = 0; i < N; i++) for (let k = 1; k <= 10; k++) b[i] += (0.2 / Math.pow(k, tilt)) * Math.sin((2 * Math.PI * k * f0 * i) / SR + k);
+    return b;
+  };
+  for (const f0 of [131, 196, 262, 330, 440]) {
+    const full = meter(tone(f0, 0.8), f0);
+    const light = meter(tone(f0, 3), f0);
+    assert.ok(full - light > 12, `${f0} Hz: llena ${full.toFixed(1)} dB, ligera ${light.toFixed(1)} dB`);
+    assert.ok(weightIndex(full) > weightIndex(light) + 0.4);
+  }
+  // Un tono puro no tiene armónicos: peso mínimo
+  const pure = new Float32Array(N);
+  for (let i = 0; i < N; i++) pure[i] = 0.3 * Math.sin((2 * Math.PI * 220 * i) / SR);
+  assert.ok(meter(pure, 220) < -25);
+  // Aguanta un error pequeño en la frecuencia detectada
+  assert.ok(Math.abs(meter(tone(220, 1.2), 220.6) - meter(tone(220, 1.2), 220)) < 1.5);
+  assert.equal(meter(pure, 0), null);
+  assert.equal(weightIndex(null), null);
+});
