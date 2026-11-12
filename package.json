@@ -1,0 +1,11 @@
+{
+  "name": "catarsis",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Entrenador vocal de metalcore: voz limpia, guturales y corrección en tiempo real.",
+  "scripts": {
+    "start": "node tools/serve.js",
+    "test": "node --test"
+  }
+}
