@@ -158,11 +158,12 @@ export function Onboarding() {
     html`<div class="ob-body hero">
       <div class="wordmark">CATARSIS</div>
       <h1>Aprende a cantar metalcore.</h1>
-      <p class="lead">Limpios que llegan arriba y screams que no lastiman. Sesiones de 7 minutos, una cosa a la vez, con corrección en vivo de lo que haces con tu voz.</p>
+      <p class="lead">Limpios que llegan arriba y screams que no lastiman. Unos minutos al día, una cosa a la vez, con corrección en vivo de lo que haces con tu voz.</p>
       <ul class="ticks">
         <li><${Icon} name="check" size=${18} /> Tú solo aprietas "Empezar". La app decide qué toca.</li>
         <li><${Icon} name="check" size=${18} /> Escucha tu voz y te dice qué corregir.</li>
-        <li><${Icon} name="check" size=${18} /> Todo se queda en tu dispositivo.</li>
+        <li><${Icon} name="check" size=${18} /> Lo aplicas en canciones de tus bandas, con YouTube Music.</li>
+        <li><${Icon} name="check" size=${18} /> Avanzas por semanas: lo aprendido vuelve como repaso hasta que se queda.</li>
       </ul>
       <button class="btn primary big" onClick=${next}>Empezar</button>
     </div>`,

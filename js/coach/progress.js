@@ -217,6 +217,8 @@ export function canStart(state, lesson, now = Date.now()) {
 
 /** Ejercicios del gimnasio disponibles según la etapa alcanzada y el objetivo. */
 export function gymAvailable(state) {
+  // El gimnasio empieza cuando ya conoces las escalas (lección "La escala del metalcore")
+  if (gradeOf(state.ex['tono-2:1']) < 1) return [];
   return GYM.filter((g) => stageStatus(state, g.needs).unlocked && !(state.profile.goal === 'clean' && isHarsh(g)));
 }
 

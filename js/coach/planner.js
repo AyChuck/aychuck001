@@ -34,10 +34,10 @@ export function buildSession(state, mode = 'daily', now = Date.now()) {
   const blocked = harshBlocked(state, now);
   const ok = (s) => !(blocked && isHarsh(s));
   const steps = [];
-  const used = new Set();
-  const add = (s) => {
-    if (s && !used.has(s.id) && ok(s)) {
-      used.add(s.id);
+  const roles = {}; // id del paso → por qué está en la sesión
+  const add = (s, role) => {
+    if (s && !roles[s.id] && ok(s)) {
+      roles[s.id] = role;
       steps.push(s);
       return true;
     }
@@ -46,13 +46,13 @@ export function buildSession(state, mode = 'daily', now = Date.now()) {
   const quick = mode === 'quick';
 
   // 1. Calentamiento (siempre): primero una sirena, que no exige oído fino.
-  add(rotate(WARMUPS.filter((w) => w.kind === 'slide'), seed));
-  if (!quick) add(rotate(WARMUPS.filter((w) => w.kind !== 'slide'), seed));
+  add(rotate(WARMUPS.filter((w) => w.kind === 'slide'), seed), 'warm');
+  if (!quick) add(rotate(WARMUPS.filter((w) => w.kind !== 'slide'), seed), 'warm');
 
   // 2. Repasos que tocan hoy, lo más atrasado primero.
   const due = dueSteps(state, now).filter(ok);
   let reviews = 0;
-  for (const s of due.slice(0, quick ? 1 : 3)) if (add(s)) reviews++;
+  for (const s of due.slice(0, quick ? 1 : 3)) if (add(s, 'review')) reviews++;
 
   // 3. Lecciones: primero lo que ya está en curso; lo nuevo, solo si hoy todavía cabe.
   const pending = pendingLessons(state).filter((l) => !(blocked && l.track === 'harsh'));
@@ -68,43 +68,43 @@ export function buildSession(state, mode = 'daily', now = Date.now()) {
     if (quick) {
       if (reviews) break; // en 2 minutos: un repaso, o un ejercicio de la lección
       const cut = rest.findIndex((s) => s.kind !== 'card');
-      rest.slice(0, cut + 1).forEach(add);
+      rest.slice(0, cut + 1).forEach((x) => add(x, 'lesson'));
       lessons.push(l);
       break;
     }
     if (lessons.length && estimateMinutes(steps) >= (isNew ? 5 : 8)) break;
-    rest.forEach(add);
+    rest.forEach((x) => add(x, 'lesson'));
     lessons.push(l);
     // Cuenta lo que esta sesión empezaría hoy, para no pasarse del tope
     if (isNew) state = { ...state, started: { ...state.started, [l.id]: dayKey(now) } };
     if (lessons.length >= 2) break;
   }
   if (quick) {
-    if (steps.length < 2) add(rotate(gymAvailable(state), seed));
-    return { steps, lesson: lessons[0] ?? null, lessons, mode, blocked, reviews, waiting };
+    if (steps.length < 2) add(rotate(gymAvailable(state), seed), 'gym');
+    return { steps, roles, lesson: lessons[0] ?? null, lessons, mode, blocked, reviews, waiting };
   }
 
   // 4. Gimnasio: si hoy no hubo material nuevo suficiente, entra un ejercicio que no conoces.
   if (estimateMinutes(steps) < 7) {
     const gym = gymAvailable(state).filter(ok);
-    add(gym.find((g) => !state.ex[g.id]) ?? rotate(gym, seed));
+    add(gym.find((g) => !state.ex[g.id]) ?? rotate(gym, seed), 'gym');
   }
 
   // 5. Riff del día: una frase nueva cada día, cuando ya conoces la mecánica.
-  if (estimateMinutes(steps) < 8 && (state.ex['tono-2:1']?.plays ?? 0) > 0) add(stepById(RIFF_ID));
+  if (estimateMinutes(steps) < 8 && (state.ex['tono-2:1']?.plays ?? 0) > 0) add(stepById(RIFF_ID), 'riff');
 
   // 6. Algo divertido que ya dominas (estilo, guturales o ritmo)
   if (estimateMinutes(steps) < 8) {
     const fun = LESSONS.filter((l) => lessonAllowed(state, l))
       .flatMap((l) => l.steps)
       .filter((s) => isScored(s) && ['style', 'harsh', 'rhythm'].includes(s.skill) && stepStatus(state, s).done);
-    if (fun.length) add(rotate(fun, seed));
+    if (fun.length) add(rotate(fun, seed), 'fun');
   }
 
   // 7. Enfriamiento
-  add(rotate(COOLDOWNS, seed));
+  add(rotate(COOLDOWNS, seed), 'cool');
 
-  return { steps, lesson: lessons[0] ?? null, lessons, mode, blocked, reviews, waiting };
+  return { steps, roles, lesson: lessons[0] ?? null, lessons, mode, blocked, reviews, waiting };
 }
 
 /** Solo repasos: para cuando quieres más sin adelantar material nuevo. */

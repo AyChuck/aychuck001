@@ -99,6 +99,51 @@ await page.addInitScript((detune) => {
     on(S.gv, t, t + secs, 0.3);
   };
 
+  window.__singMelody = (midis, secs) => {
+    let t = S.c.currentTime + 0.2;
+    for (const m of midis) {
+      S.osc.frequency.setValueAtTime(midiToFreq(m), t);
+      on(S.gv, t, t + secs - 0.12, 0.3);
+      t += secs;
+    }
+  };
+
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (url, ...rest) =>
+    String(url).includes('youtube.com/oembed')
+      ? Promise.resolve(new Response(JSON.stringify({ title: 'Canción de prueba', author_name: 'Banda - Topic' }), { headers: { 'Content-Type': 'application/json' } }))
+      : realFetch(url, ...rest);
+
+  // YouTube simulado: desde el entorno de pruebas no hay acceso a youtube.com
+  window.YT = {
+    Player: class {
+      constructor(el, opts) {
+        this.opts = opts;
+        this.state = -1;
+        this.t = 0;
+        this.rate = 1;
+        const f = document.createElement('iframe');
+        f.srcdoc = '<body style="margin:0;background:#111;color:#888;font:14px sans-serif;display:grid;place-items:center;height:100vh">YouTube (simulado)</body>';
+        el.replaceWith(f);
+        this.f = f;
+        window.__ytLast = this;
+        setInterval(() => this.state === 1 && (this.t += 0.1 * this.rate), 100);
+        setTimeout(() => opts.events.onReady({ target: this }), 50);
+      }
+      playVideo() { this.state = 1; }
+      pauseVideo() { this.state = 2; }
+      seekTo(t) { this.t = t; }
+      getCurrentTime() { return this.t; }
+      getDuration() { return 215; }
+      getPlayerState() { return this.state; }
+      setPlaybackRate(r) { this.rate = r; }
+      getAvailablePlaybackRates() { return [0.25, 0.5, 0.75, 1, 1.25]; }
+      getVideoData() { return { title: 'Video de prueba', author: 'Canal - Topic', video_id: this.opts.videoId }; }
+      getPlaylist() { return ['aaaaaaaaaaa', 'bbbbbbbbbbb', 'ccccccccccc']; }
+      destroy() { this.f.remove(); }
+    },
+  };
+
   window.__perform = () => {
     const { plan, t0 } = window.__take;
     const lag = 0.03;
@@ -216,14 +261,15 @@ await page.locator('.hero-card .btn.primary').click();
 await drive();
 await shot('13-resumen');
 const summary = await page.locator('.summary').innerText();
-await click('Listo por hoy');
+await page.getByRole('button', { name: 'Listo por hoy' }).click();
 await shot('14-hoy-despues');
 
 // Lecciones sueltas desde la Ruta (se marcan todas como aprobadas para abrir las etapas)
 await page.evaluate(async () => {
   const { LESSONS } = await import('/js/content/curriculum.js');
   const st = JSON.parse(localStorage.getItem('catarsis.v1'));
-  for (const l of LESSONS) for (const x of l.steps) st.ex[x.id] ??= { plays: 1, best: 85, last: 85, ts: Date.now() - 3 * 86400000, ease: 0, fails: 0 };
+  for (const l of LESSONS) for (const x of l.steps) st.ex[x.id] = { plays: 2, best: 85, last: 85, ts: Date.now() - 3 * 86400000, ease: 0, fails: 0, ...st.ex[x.id], grade: 2, due: Date.now() + 5 * 86400000 };
+  for (const l of LESSONS) st.started[l.id] ??= '2026-01-01';
   localStorage.setItem('catarsis.v1', JSON.stringify(st));
 });
 await page.reload();
@@ -234,14 +280,40 @@ for (const name of TOUR) {
   if (!shots.ruta) { await shot('15-ruta'); shots.ruta = true; }
   await page.locator('.lesson-detail .btn.primary').click();
   await drive();
-  await click('Listo por hoy');
+  await page.getByRole('button', { name: 'Listo por hoy' }).click();
 }
+
+// Canciones: del catálogo al repertorio, enlace, toma y reporte
+await page.getByRole('button', { name: 'Canciones' }).first().click();
+await shot('21-canciones');
+await page.locator('.song-row .song-main').first().click();
+await page.locator('.song-detail .btn.primary').first().click();
+await page.locator('#song-attach').fill('https://music.youtube.com/watch?v=abcdefghijk&si=x');
+await click('Guardar');
+await page.locator('.transport').waitFor({ timeout: 8000 });
+await shot('22-cancion');
+await click('Grabar toma');
+await page.locator('canvas.roll').waitFor();
+await page.waitForTimeout(400);
+const ytPlaying = await page.evaluate(() => window.__ytLast?.state === 1);
+await page.evaluate(() => window.__singMelody([57, 60, 62, 64, 62, 60, 57, 55, 57], 0.9));
+await page.waitForTimeout(4500);
+await shot('23-cancion-toma');
+await page.waitForTimeout(4500);
+await click('Terminar toma');
+await page.locator('.report').waitFor();
+const songScore = Number(await page.locator('.report .score-ring .num').innerText());
+await shot('24-cancion-reporte');
+const songSaved = await page.evaluate(() => Object.values(JSON.parse(localStorage.getItem('catarsis.v1')).songs)[0]);
+await page.locator('.song-view .icon-btn').first().click();
 
 await page.getByRole('button', { name: 'Progreso' }).last().click();
 await shot('16-progreso');
+await page.getByRole('button', { name: 'Hoy' }).first().click();
+await shot('25-hoy-con-cancion');
 await page.getByRole('button', { name: 'Ajustes' }).click();
 await shot('17-ajustes');
-await page.getByRole('button', { name: 'Libre' }).click();
+await page.evaluate(() => (location.hash = 'libre'));
 await click('Abrir micrófono');
 await page.locator('.tuner').waitFor();
 await page.waitForTimeout(300);
@@ -249,11 +321,12 @@ await page.evaluate(() => window.__singSiren(50, 57, 3));
 await page.waitForTimeout(1600);
 await shot('18-libre');
 
-console.log(JSON.stringify({ rangeText, results, summary: summary.split('\n').slice(0, 8), errors }, null, 2));
+const song = { ytPlaying, songScore, takes: songSaved?.takes?.length, video: songSaved?.video };
+console.log(JSON.stringify({ rangeText, results, song, summary: summary.split('\n').slice(0, 8), errors }, null, 2));
 await browser.close();
 // El cantante virtual no cambia el color del scream ni el volumen, así que esas tomas no se exigen.
 const bad = results.filter((r) => r.score < 80 && !['GRAVES, MEDIOS Y AGUDOS', 'TRES COLORES', 'CORO: BRASAS'].includes(r.title.toUpperCase()));
-if (DETUNE === 0 && (errors.length || bad.length || !results.length)) {
+if (DETUNE === 0 && (errors.length || bad.length || !results.length || !(song.songScore >= 80) || song.takes !== 1 || !song.ytPlaying)) {
   console.error('FALLÓ', { errors, bad });
   process.exit(1);
 }

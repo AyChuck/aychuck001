@@ -2,13 +2,15 @@
 
 import { html, useState, useMemo, useRef } from '../lib.js';
 import { Icon, Stars, Bar, Toggle, Choice } from './common.js';
+import { GradePips } from './Player.js';
 import { RangeTest } from './Onboarding.js';
-import { buildSession, lessonSession, estimateMinutes } from '../coach/planner.js';
+import { buildSession, lessonSession, reviewSession, singleSession, estimateMinutes } from '../coach/planner.js';
 import {
-  streak, week, level, lessonStatus, stageStatus, stepStatus, nextLesson, harshBlocked, harshLeft, lessonAllowed,
-  dayKey, SKILLS, ACHIEVEMENTS, HARSH_BUDGET,
+  streak, week, level, lessonStatus, stageStatus, stepStatus, nextLesson, harshBlocked, harshLeft, lessonAllowed, canStart,
+  dueSteps, dueIn, isDue, gymAvailable, gradeOf, dayKey, SKILLS, ACHIEVEMENTS, HARSH_BUDGET, GRADE_NAMES, STAGE_GRADE,
 } from '../coach/progress.js';
-import { LESSONS, STAGES, TRACKS, isScored, isHarsh, stepById } from '../content/curriculum.js';
+import { songStatus, recommend } from '../coach/songs.js';
+import { LESSONS, STAGES, TRACKS, GYM, isScored, stepById } from '../content/curriculum.js';
 import { midiName, voiceType, rangeLabel } from '../music/notes.js';
 import { startMic, calibrate, unlockAudio } from '../audio/engine.js';
 import { useStore, patchSettings, patchProfile, exportData, importData, resetAll } from '../store.js';
@@ -17,14 +19,21 @@ import { useStore, patchSettings, patchProfile, exportData, importData, resetAll
 
 function sessionOutline(ses) {
   const out = [];
+  let reviews = 0;
   const push = (x) => out[out.length - 1] !== x && out.push(x);
   for (const s of ses.steps) {
-    if (s.id.startsWith('w-')) push('Calentar');
-    else if (s.id.startsWith('c-')) push('Enfriar');
-    else if (ses.lessons?.some((l) => l.id === s.lesson)) push(ses.lessons.find((l) => l.id === s.lesson).title);
-    else if (s.kind !== 'card') push(`Repaso: ${s.title}`);
+    const role = ses.roles?.[s.id];
+    if (role === 'warm') push('Calentar');
+    else if (role === 'cool') push('Enfriar');
+    else if (role === 'review') {
+      reviews++;
+      push('__rev');
+    } else if (role === 'lesson') push(`Lección: ${ses.lessons.find((l) => l.id === s.lesson)?.title ?? s.title}`);
+    else if (role === 'gym') push(`Gimnasio: ${s.title}`);
+    else if (role === 'riff') push('Riff del día');
+    else if (role === 'fun') push(`Algo que ya te sale: ${s.title}`);
   }
-  return out;
+  return out.map((x) => (x === '__rev' ? `${reviews} ${reviews === 1 ? 'repaso' : 'repasos'} para subir de grado` : x));
 }
 
 export function Home({ onStart, go }) {
@@ -36,31 +45,45 @@ export function Home({ onStart, go }) {
   const st = streak(s);
   const today = s.days[dayKey()];
   const blocked = harshBlocked(s);
-  const upcoming = nextLesson(s);
   const mins = estimateMinutes(daily.steps);
+  const due = dueSteps(s).length;
+  const song = s.focusSong ? s.songs[s.focusSong] : null;
+  const rec = useMemo(() => (song ? null : recommend(s, 1)[0]), [s.songs, s.taste, song]);
+  const title = daily.lessons.length ? daily.lessons[0].title : daily.reviews ? 'Día de repaso' : 'Gimnasio vocal';
 
   return html`<div class="screen">
     <header class="top">
       <div class="wordmark sm">CATARSIS</div>
-      <button class="level-chip" onClick=${() => go('progreso')} aria-label="Ver progreso">
-        <span class="num">Nv ${lv.lvl}</span> ${lv.rank}
-      </button>
+      <div class="top-actions">
+        <button class="level-chip" onClick=${() => go('progreso')} aria-label="Ver progreso"><span class="num">Nv ${lv.lvl}</span> ${lv.rank}</button>
+        <button class="icon-btn" aria-label="Ajustes" onClick=${() => go('ajustes')}><${Icon} name="gear" /></button>
+      </div>
     </header>
 
     <section class="hero-card">
       <div class="eyebrow">${today ? 'Hoy ya cantaste' : 'Sesión de hoy'} · ${mins} min</div>
-      <h1>${upcoming ? upcoming.title : 'Repaso libre'}</h1>
+      <h1>${title}</h1>
       <ol class="outline">
         ${sessionOutline(daily).map((x) => html`<li>${x}</li>`)}
       </ol>
       <button class="btn primary big" onClick=${() => onStart(daily)}><${Icon} name="play" fill=${true} size=${20} /> ${today ? 'Otra ronda' : 'Empezar'}</button>
       <button class="btn ghost" onClick=${() => onStart(quick)}><${Icon} name="clock" size=${18} /> Solo tengo 2 minutos</button>
+      ${daily.waiting &&
+      !daily.lessons.length &&
+      html`<p class="muted small">Lo nuevo de hoy ya está visto. Mañana se abre <b>${daily.waiting.title}</b>: la voz asienta lo aprendido mientras duermes, no por repetir el mismo día.</p>`}
     </section>
 
     ${blocked &&
     html`<div class="note ${blocked === 'hurt' ? 'warn' : ''}">
       <b>Guturales en pausa.</b> ${blocked === 'budget' ? 'Ya usaste tus 4 minutos de hoy.' : blocked === 'hurt' ? 'Tu garganta descansa 24 horas. Agua y nada de susurrar.' : 'Tu garganta descansa unas horas.'} Lo demás sigue abierto.
     </div>`}
+
+    <button class="tile wide" onClick=${() => go('canciones', song?.id)}>
+      <${Icon} name="play" />
+      ${song
+        ? html`<b>${song.title}</b><small>${song.artist} · tu canción en foco · ${song.takes.length ? `última toma ${song.takes.at(-1).score}` : 'sin tomas todavía'}</small>`
+        : html`<b>Canta una canción real</b><small>${rec ? `Para empezar: ${rec.title}, de ${rec.artist}` : 'Elige una de tus bandas'}</small>`}
+    </button>
 
     <section class="panel">
       <div class="panel-head">
@@ -74,21 +97,47 @@ export function Home({ onStart, go }) {
     </section>
 
     <div class="row">
+      <button class="tile" onClick=${() => onStart(reviewSession(s))}><${Icon} name="redo" /><b>${due ? `${due} ${due === 1 ? 'repaso' : 'repasos'} hoy` : 'Práctica extra'}</b><small>${due ? 'Lo que toca para subir de grado' : 'Refuerza lo menos asentado'}</small></button>
       <button class="tile" onClick=${() => go('ruta')}><${Icon} name="route" /><b>Ruta</b><small>${LESSONS.filter((l) => lessonStatus(s, l).done).length} de ${LESSONS.filter((l) => lessonAllowed(s, l)).length} lecciones</small></button>
-      <button class="tile" onClick=${() => go('libre')}><${Icon} name="mic" /><b>Práctica libre</b><small>Afinador y grabadora</small></button>
     </div>
   </div>`;
 }
 
 // ───────────────────────── Ruta ─────────────────────────
 
+function StepLine({ step, state, onPlay }) {
+  const xs = stepStatus(state, step);
+  const due = isDue(state, step);
+  const wait = dueIn(state, step);
+  return html`<li>
+    <span class="step-name">${step.title}${isScored(step) && xs.grade > 0 ? html`<small>${GRADE_NAMES[xs.grade]} · ${due ? 'repaso hoy' : wait ? `repaso en ${wait} ${wait === 1 ? 'día' : 'días'}` : 'al día'}</small>` : ''}</span>
+    ${isScored(step)
+      ? xs.plays
+        ? html`<${GradePips} grade=${xs.grade} />`
+        : html`<span class="muted small">nuevo</span>`
+      : xs.done
+        ? html`<${Icon} name="check" size=${16} />`
+        : ''}
+    ${onPlay && html`<button class="icon-btn sm" aria-label=${`Practicar ${step.title}`} onClick=${() => onPlay(step)}><${Icon} name="play" size=${16} fill=${true} /></button>`}
+  </li>`;
+}
+
 export function Path({ onStart }) {
   const s = useStore();
   const [open, setOpen] = useState(null);
   const next = nextLesson(s);
+  const gym = gymAvailable(s);
+  const due = dueSteps(s);
 
   return html`<div class="screen">
     <header class="top"><h1 class="title">Ruta</h1></header>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Cómo se avanza</h2></div>
+      <p class="muted small">Cada ejercicio tiene 5 grados. Subes uno por día como máximo, y cada grado lo hace más difícil. Lo aprobado vuelve como repaso a los 1, 2, 4, 8 y 21 días. Así se queda en la voz.</p>
+      ${due.length > 0 && html`<button class="btn primary" onClick=${() => onStart(reviewSession(s))}><${Icon} name="redo" size=${18} /> Hacer mis ${due.length} repasos de hoy</button>`}
+    </section>
+
     ${STAGES.map((stage, si) => {
       const ss = stageStatus(s, stage.id);
       const lessons = LESSONS.filter((l) => l.stage === stage.id && lessonAllowed(s, l));
@@ -97,37 +146,62 @@ export function Path({ onStart }) {
           <div>
             <div class="eyebrow">Etapa ${si + 1}</div>
             <h2>${stage.name}</h2>
-            <p class="muted small">${ss.unlocked ? stage.blurb : `Se abre al terminar la mayoría de "${STAGES[si - 1].name}"`}</p>
+            <p class="muted small">${stage.blurb}</p>
           </div>
-          ${ss.unlocked ? html`<span class="num">${lessons.filter((l) => lessonStatus(s, l).done).length}/${lessons.length}</span>` : html`<${Icon} name="lock" />`}
+          ${ss.unlocked ? html`<span class="num">${ss.done}/${ss.total}</span>` : html`<${Icon} name="lock" />`}
         </div>
+        ${!ss.unlocked &&
+        ss.gate &&
+        stageStatus(s, STAGES[si - 1].id).unlocked &&
+        html`<div class="gate">
+          <${Bar} label=${`Lecciones de "${STAGES[si - 1].name}"`} value=${(ss.gate.lessons / ss.gate.needLessons) * 100} tone="ember" right=${`${ss.gate.lessons} de ${ss.gate.needLessons}`} />
+          <${Bar} label="Consolidación (grado promedio)" value=${(ss.gate.grade / ss.gate.needGrade) * 100} tone="ice" right=${`${ss.gate.grade.toFixed(1)} de ${STAGE_GRADE}`} />
+          <p class="muted small">Se abre cuando lo anterior está aprobado y repasado en días distintos.</p>
+        </div>`}
         ${ss.unlocked &&
         html`<ul class="lessons">
           ${lessons.map((l) => {
             const ls = lessonStatus(s, l);
             const isOpen = open === l.id;
+            const can = canStart(s, l);
             return html`<li class=${`lesson ${ls.done ? 'done' : ''} ${next?.id === l.id ? 'next' : ''}`}>
               <button class="lesson-row" aria-expanded=${isOpen} onClick=${() => setOpen(isOpen ? null : l.id)}>
                 <span class=${`track t-${l.track}`}><${Icon} name=${TRACKS[l.track].art} size=${20} /></span>
                 <span class="lesson-text"><b>${l.title}</b><small>${TRACKS[l.track].name} · ${l.blurb}</small></span>
-                ${ls.done ? html`<${Stars} n=${ls.stars} />` : next?.id === l.id ? html`<span class="pill">Sigue</span>` : ls.started ? html`<span class="pill dim">En curso</span>` : ''}
+                ${ls.done ? html`<${Stars} n=${ls.stars} />` : !can ? html`<span class="pill dim">Mañana</span>` : next?.id === l.id ? html`<span class="pill">Sigue</span>` : ls.started ? html`<span class="pill dim">En curso</span>` : ''}
               </button>
               ${isOpen &&
               html`<div class="lesson-detail">
                 ${l.listen && html`<p class="listen-hint"><b>Para el oído.</b> ${l.listen}</p>`}
                 <ul class="steps">
-                  ${l.steps.filter((x) => x.kind !== 'card').map((x) => {
-                    const xs = stepStatus(s, x);
-                    return html`<li><span>${x.title}</span>${isScored(x) ? (xs.plays ? html`<span class="num small">${Math.round(xs.best)}</span>` : html`<span class="muted small">nuevo</span>`) : xs.done ? html`<${Icon} name="check" size=${16} />` : ''}</li>`;
-                  })}
+                  ${l.steps.filter((x) => x.kind !== 'card').map((x) => html`<${StepLine} step=${x} state=${s} />`)}
                 </ul>
-                <button class="btn primary" onClick=${() => onStart(lessonSession(s, l))}><${Icon} name="play" fill=${true} size=${18} /> ${ls.done ? 'Practicar otra vez' : 'Empezar lección'} · ${estimateMinutes(lessonSession(s, l).steps)} min</button>
+                ${can
+                  ? html`<button class="btn primary" onClick=${() => onStart(lessonSession(s, l))}><${Icon} name="play" fill=${true} size=${18} /> ${ls.done ? 'Practicar otra vez' : ls.started ? 'Continuar lección' : 'Empezar lección'} · ${estimateMinutes(lessonSession(s, l).steps)} min</button>`
+                  : html`<p class="note">Hoy ya empezaste material nuevo. Esta lección se abre mañana: lo de hoy necesita una noche para asentarse. Mientras, repasa o canta una canción.</p>`}
               </div>`}
             </li>`;
           })}
         </ul>`}
       </section>`;
     })}
+
+    <section class="stage">
+      <div class="stage-head">
+        <div>
+          <div class="eyebrow">Sin fin</div>
+          <h2>Gimnasio</h2>
+          <p class="muted small">Ejercicios que siguen después de las lecciones. Se abren más con cada etapa.</p>
+        </div>
+        <span class="num">${gym.length}/${GYM.length}</span>
+      </div>
+      <div class="lesson"><div class="lesson-detail">
+        <ul class="steps">
+          <${StepLine} step=${stepById('riff-dia')} state=${s} onPlay=${(x) => onStart(singleSession(x))} />
+          ${gym.map((x) => html`<${StepLine} step=${x} state=${s} onPlay=${(st) => onStart(singleSession(st))} />`)}
+        </ul>
+      </div></div>
+    </section>
   </div>`;
 }
 
@@ -156,6 +230,10 @@ export function Progress() {
   const p = s.profile;
   const recent = s.history.slice(-24);
   const grown = p.firstHigh != null ? p.high - p.low - (p.firstHigh - p.firstLow) : 0;
+  const pool = [...LESSONS.filter((l) => lessonAllowed(s, l)).flatMap((l) => l.steps), ...GYM].filter(isScored);
+  const grades = [0, 0, 0, 0, 0, 0];
+  for (const st of pool) grades[gradeOf(s.ex[st.id])]++;
+  const songs = Object.values(s.songs);
 
   return html`<div class="screen">
     <header class="top"><h1 class="title">Progreso</h1></header>
@@ -166,8 +244,19 @@ export function Progress() {
       <div class="stat-row">
         <div class="stat"><span class="num">${streak(s)}</span><small>racha</small></div>
         <div class="stat"><span class="num">${Object.keys(s.days).length}</span><small>días cantados</small></div>
-        <div class="stat"><span class="num">${s.xp}</span><small>XP total</small></div>
+        <div class="stat"><span class="num">${songs.filter((x) => x.mastered).length}</span><small>canciones dominadas</small></div>
       </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>Qué tan asentado está</h2><span class="num">${pool.length - grades[0]}/${pool.length}</span></div>
+      <div class="grades" role="img" aria-label="Ejercicios por grado">
+        ${grades.map((n, g) => html`<div class=${`g${g}`} style=${`flex:${n || 0.001}`} title=${`${GRADE_NAMES[g]}: ${n}`}></div>`)}
+      </div>
+      <ul class="legend">
+        ${grades.map((n, g) => html`<li><i class=${`g${g}`}></i>${GRADE_NAMES[g]} <b class="num">${n}</b></li>`)}
+      </ul>
+      <p class="muted small">Aprobar es el grado 1. Dominar algo de verdad es llevarlo al 5, y eso toma semanas de repasos.</p>
     </section>
 
     <section class="panel">
@@ -176,6 +265,7 @@ export function Progress() {
       <p class="muted small">
         ${rangeLabel(p.low, p.high)} de rango de trabajo, cercano a ${voiceType(p.low, p.high).toLowerCase()}.
         ${grown > 0 ? ` Creció ${grown} semitono${grown > 1 ? 's' : ''} desde que empezaste.` : p.tested ? '' : ' Haz la prueba de rango en Ajustes para afinarlo.'}
+        ${(s.records?.air ?? 0) > 0 ? ` Tu aire más largo: ${s.records.air} s.` : ''}
       </p>
     </section>
 
@@ -190,10 +280,18 @@ export function Progress() {
       <div class="panel-head"><h2>Últimas tomas</h2></div>
       ${recent.length
         ? html`<div class="spark" role="img" aria-label="Puntajes de tus últimas tomas">
-            ${recent.map((h) => html`<i class=${h.score >= 75 ? 'ok' : h.score >= 55 ? 'warn' : 'bad'} style=${`height:${Math.max(6, h.score)}%`} title=${`${stepById(h.id)?.title ?? ''}: ${h.score}`}></i>`)}
+            ${recent.map((h) => html`<i class=${h.score >= 75 ? 'ok' : h.score >= 60 ? 'warn' : 'bad'} style=${`height:${Math.max(6, h.score)}%`} title=${`${stepById(h.id)?.title ?? ''}: ${h.score}`}></i>`)}
           </div>`
         : html`<p class="muted">Aquí van a aparecer tus puntajes después de la primera sesión.</p>`}
     </section>
+
+    ${songs.length > 0 &&
+    html`<section class="panel">
+      <div class="panel-head"><h2>Repertorio</h2><span class="num">${songs.length}</span></div>
+      <ul class="steps">
+        ${songs.map((x) => html`<li><span class="step-name">${x.title}<small>${x.artist}</small></span><span class=${`pill ${x.mastered ? 'ok' : 'dim'}`}>${{ nueva: 'Nueva', trabajo: 'En trabajo', dominada: 'Dominada' }[songStatus(x)]}</span></li>`)}
+      </ul>
+    </section>`}
 
     <section class="panel">
       <div class="panel-head"><h2>Logros</h2><span class="num">${Object.keys(s.ach).length}/${ACHIEVEMENTS.length}</span></div>

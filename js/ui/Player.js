@@ -6,7 +6,7 @@ import { Icon, Stars, Canvas, Bar } from './common.js';
 import { drawPitch, drawEnergy } from './rolls.js';
 import { buildPlan } from '../coach/plan.js';
 import { scoreTake } from '../coach/scoring.js';
-import { PASS, harshBlocked, level, streak } from '../coach/progress.js';
+import { PASS, harshBlocked, level, streak, gradeOf, isDue, GRADE_NAMES, GRADE_NEED, MAX_GRADE } from '../coach/progress.js';
 import { isScored, isHarsh, TRACKS, lessonById } from '../content/curriculum.js';
 import { startMic, onFrame, audioCtx, setGate, setGritSensitivity, unlockAudio, getStream } from '../audio/engine.js';
 import { createBus, sfx } from '../audio/synth.js';
@@ -267,7 +267,7 @@ function PacerStep({ step, plan, onNext }) {
 
 // ───────────────────────── Intro y resultado ─────────────────────────
 
-function Intro({ step, ease, onStart, settings }) {
+function Intro({ step, ease, grade, review, onStart, settings }) {
   const track = TRACKS[step.skill];
   const kindNote =
     step.kind === 'rhythm' && !settings.headphones
@@ -280,10 +280,20 @@ function Intro({ step, ease, onStart, settings }) {
     <h2>${step.title}</h2>
     <p class="cue">${step.cue}</p>
     ${step.how && html`<ul class="how">${step.how.map((x) => html`<li>${x}</li>`)}</ul>`}
+    ${!step.nograde &&
+    grade > 0 &&
+    html`<div class="grade-line">
+      <${GradePips} grade=${grade} />
+      <span>${review ? 'Repaso. ' : ''}${grade >= MAX_GRADE ? 'Dominado: hoy solo lo mantienes.' : `Grado ${grade}, ${GRADE_NAMES[grade]}. Hoy es más exigente; con ${GRADE_NEED[grade]}+ subes a ${GRADE_NAMES[grade + 1]}.`}</span>
+    </div>`}
     ${ease > 0 && html`<p class="note">Modo fácil activo: más margen y un poco más lento.</p>`}
     ${kindNote && html`<p class="muted small">${kindNote}</p>`}
     <button class="btn primary big" onClick=${onStart}><${Icon} name="mic" /> Empezar</button>
   </div>`;
+}
+
+export function GradePips({ grade }) {
+  return html`<span class="pips" aria-label=${`Grado ${grade} de ${MAX_GRADE}`}>${[1, 2, 3, 4, 5].map((i) => html`<i class=${i <= grade ? 'on' : ''}></i>`)}</span>`;
 }
 
 function Result({ step, result, outcome, onRetry, onNext, last, audio }) {
@@ -314,6 +324,10 @@ function Result({ step, result, outcome, onRetry, onNext, last, audio }) {
 
     ${ev.map((e) => {
       if (e.type === 'easier') return html`<div class="event">Activé el modo fácil para este ejercicio. Sin presión.</div>`;
+      if (e.type === 'grade') return html`<div class="event hot"><${GradePips} grade=${e.grade} /> Grado ${e.grade}: ${e.name}. Vuelve en ${e.days} ${e.days === 1 ? 'día' : 'días'}, un poco más difícil.</div>`;
+      if (e.type === 'gradeWait') return html`<div class="event">Ya subiste de grado hoy en este ejercicio. El siguiente (${e.next}) se gana otro día: así se queda grabado.</div>`;
+      if (e.type === 'gradeShort') return html`<div class="event">Aprobado. Para subir a ${e.next} necesitas ${e.need}+. Vuelve mañana.</div>`;
+      if (e.type === 'stage') return html`<div class="event hot">Etapa nueva abierta: ${e.stage.name}</div>`;
       if (e.type === 'level') return html`<div class="event hot">Nivel ${e.lvl}: ${e.rank}</div>`;
       if (e.type === 'ach') return html`<div class="event hot">Logro: ${e.ach.name}</div>`;
       if (e.type === 'lesson') return html`<div class="event hot">Lección completa: ${e.lesson.title}</div>`;
@@ -355,8 +369,9 @@ function ThroatAdvice({ status, onNext }) {
   </div>`;
 }
 
-function Summary({ log, startXp, onExit, onMore }) {
+function Summary({ log, startXp, onExit, onMore, onSong }) {
   const s = useStore();
+  const song = s.focusSong ? s.songs[s.focusSong] : null;
   const gained = s.xp - startXp;
   const lv = level(s.xp);
   const scored = log.filter((x) => x.result);
@@ -376,8 +391,14 @@ function Summary({ log, startXp, onExit, onMore }) {
     <ul class="log">
       ${scored.map((x) => html`<li><span>${x.step.title}</span><${Stars} n=${x.result.stars} /></li>`)}
     </ul>
+    ${log.length > 0 &&
+    html`<button class="tile wide" onClick=${onSong}>
+      <${Icon} name="play" />
+      <b>${song ? `Ahora aplícalo: ${song.title}` : 'Ahora aplícalo en una canción'}</b>
+      <small>${song ? `${song.artist} · una toma de tu canción en foco` : 'Elige una de tus bandas y canta encima'}</small>
+    </button>`}
     <div class="row">
-      <button class="btn ghost" onClick=${onMore}>Una más (2 min)</button>
+      <button class="btn ghost" onClick=${onMore}>Repasar más</button>
       <button class="btn primary" onClick=${onExit}>Listo por hoy</button>
     </div>
   </div>`;
@@ -385,7 +406,7 @@ function Summary({ log, startXp, onExit, onMore }) {
 
 // ───────────────────────── Orquestador ─────────────────────────
 
-export function Player({ session, onExit, onMore }) {
+export function Player({ session, onExit, onMore, onSong }) {
   useWakeLock();
   const s = useStore();
   const [steps, setSteps] = useState(session.steps);
@@ -410,9 +431,15 @@ export function Player({ session, onExit, onMore }) {
 
   const step = steps[idx];
   const ease = step ? (s.ex[step.id]?.ease ?? 0) : 0;
+  // El grado (dificultad) queda fijo mientras estás en el paso, aunque subas de grado al aprobar.
+  const entry = useRef({});
+  if (step && !entry.current[step.id]) {
+    entry.current[step.id] = { grade: step.nograde ? 0 : gradeOf(s.ex[step.id]), review: isScored(step) && isDue(s, step) };
+  }
+  const { grade, review } = step ? entry.current[step.id] : { grade: 0, review: false };
   const plan = useMemo(
-    () => (step ? buildPlan(step, s.profile, { ease, strict: s.settings.strict }) : null),
-    [step?.id, attempt, ease, s.profile.low, s.profile.high, s.settings.strict]
+    () => (step ? buildPlan(step, s.profile, { ease, grade, strict: s.settings.strict }) : null),
+    [step?.id, attempt, ease, grade, s.profile.low, s.profile.high, s.settings.strict]
   );
 
   const goNext = (from = idx, list = steps) => {
@@ -458,7 +485,7 @@ export function Player({ session, onExit, onMore }) {
   };
 
   if (phase === 'done' || !step) {
-    return html`<div class="player"><${Summary} log=${log.current} startXp=${startXp.current} onExit=${onExit} onMore=${onMore} /></div>`;
+    return html`<div class="player"><${Summary} log=${log.current} startXp=${startXp.current} onExit=${onExit} onMore=${onMore} onSong=${onSong} /></div>`;
   }
 
   const blocked = isHarsh(step) && harshBlocked(s) && phase === 'intro';
@@ -477,7 +504,7 @@ export function Player({ session, onExit, onMore }) {
   } else if (step.kind === 'card') body = html`<${CardStep} key=${step.id} step=${step} onNext=${finishSimple} listen=${lesson && lesson.steps[0].id === step.id ? lesson.listen : null} />`;
   else if (step.kind === 'pacer') body = html`<${PacerStep} key=${step.id} step=${step} plan=${plan} onNext=${finishSimple} />`;
   else if (phase === 'intro') {
-    body = html`<${Intro} step=${step} ease=${ease} settings=${s.settings} onStart=${async () => {
+    body = html`<${Intro} step=${step} ease=${ease} grade=${grade} review=${review} settings=${s.settings} onStart=${async () => {
       await unlockAudio();
       dropAudio();
       setPhase('take');
@@ -502,7 +529,7 @@ export function Player({ session, onExit, onMore }) {
       </div>
       <span class="num small">${idx + 1}/${steps.length}</span>
     </header>
-    ${lesson && phase === 'intro' && html`<div class="lesson-tag">${lesson.title}</div>`}
+    ${phase === 'intro' && (lesson || step.gym || review) && html`<div class="lesson-tag">${review ? 'Repaso' : step.gym ? 'Gimnasio' : lesson.title}</div>`}
     <main class="player-body">${body}</main>
     ${isScored(step) && phase === 'intro' && !blocked && html`<button class="btn ghost small skip" onClick=${() => goNext()}>Saltar este</button>`}
   </div>`;

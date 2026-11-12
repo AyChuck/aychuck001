@@ -249,8 +249,11 @@ test('riff del día: estable dentro del día, distinto entre días, y sin grado'
   assert.equal(isDue(r.state, stepById(RIFF_ID), T0 + 5 * DAY), false);
 });
 
-test('el gimnasio se abre por etapas', () => {
-  const s0 = defaultState();
-  assert.ok(gymAvailable(s0).every((g) => g.needs === 's1'));
+test('el gimnasio empieza al conocer las escalas y se abre por etapas', () => {
+  assert.equal(gymAvailable(defaultState()).length, 0);
+  assert.ok(!buildSession(defaultState(), 'daily', T0).steps.some((x) => x.gym));
+  const s1 = record(defaultState(), 'tono-2:1', { score: 90, stars: 3 }, T0).state;
+  assert.ok(gymAvailable(s1).length >= 4);
+  assert.ok(gymAvailable(s1).every((g) => g.needs === 's1'));
   assert.ok(GYM.some((g) => g.needs === 's4'));
 });

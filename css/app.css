@@ -328,6 +328,75 @@ textarea { width: 100%; border-radius: 10px; border: 1px solid var(--line); back
 .needle-labels { width: 100%; display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
 .playback { width: 100%; }
 
+/* ───── Grados y repasos ───── */
+.top-actions { display: flex; align-items: center; gap: 4px; }
+.pips { display: inline-flex; gap: 3px; flex: none; vertical-align: middle; }
+.pips i { width: 7px; height: 14px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line); }
+.pips i.on { background: var(--ember); border-color: var(--ember); }
+.grade-line { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); font-size: 14.5px; color: var(--muted); }
+.gate { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); }
+.stage.locked .gate { opacity: 1; }
+.stage.locked { opacity: 1; }
+.stage.locked .stage-head { opacity: 0.55; }
+.step-name { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.step-name small { color: var(--muted); font-size: 12.5px; }
+.steps li { align-items: center; }
+.icon-btn.sm { width: 36px; height: 36px; color: var(--ember-hot); background: var(--surface-2); }
+.grades { display: flex; gap: 2px; height: 16px; border-radius: 6px; overflow: hidden; }
+.grades > div, .legend i { background: var(--surface-2); }
+.g1 { background: #5a3324 !important; }
+.g2 { background: #8f4326 !important; }
+.g3 { background: #c7502a !important; }
+.g4 { background: var(--ember) !important; }
+.g5 { background: var(--ember-hot) !important; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; }
+.legend b { color: var(--fg); font-size: 15px; }
+.tile.wide { width: 100%; }
+.pill.ok { background: var(--ok); color: #06210f; }
+
+/* ───── Canciones ───── */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+input[type='url'], input[type='search'] { width: 100%; min-width: 0; min-height: 46px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; }
+input::placeholder { color: var(--muted); }
+.link-form { display: flex; gap: 8px; }
+.link-form input { flex: 1; }
+.link-form .btn { flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 7px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 13.5px; font-weight: 600; }
+.chip.on { border-color: var(--ember); color: var(--fg); background: rgba(255, 91, 46, 0.14); }
+.songs { display: flex; flex-direction: column; }
+.song-row { border-top: 1px solid var(--line); }
+.song-row:first-child { border-top: 0; }
+.song-main { width: 100%; display: flex; align-items: center; gap: 10px; padding: 11px 0; text-align: left; }
+.song-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.song-text b { overflow-wrap: anywhere; }
+.song-text small { color: var(--muted); font-size: 13px; }
+.song-detail { display: flex; flex-direction: column; gap: 10px; padding: 0 0 14px; }
+.lvl { display: inline-flex; gap: 2px; flex: none; vertical-align: middle; }
+.lvl i { width: 6px; height: 12px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line); }
+.lvl i.on { background: var(--ice); border-color: var(--ice); }
+.tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag { padding: 2px 9px; border-radius: 6px; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 600; }
+.song-title { font: 900 36px/1 var(--display); text-transform: uppercase; text-wrap: balance; overflow-wrap: anywhere; }
+.yt { width: 100%; aspect-ratio: 16 / 9; max-height: 34vh; border-radius: var(--r); overflow: hidden; background: #000; border: 1px solid var(--line); }
+.yt iframe { width: 100%; height: 100%; border: 0; display: block; }
+.transport { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; }
+.row-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.loop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.loop-on { font-weight: 700; color: var(--ember-hot); font-size: 14.5px; }
+.roll.short { height: min(30vh, 240px); }
+.report { gap: 14px; }
+.report-head { display: flex; align-items: center; gap: 16px; }
+.score-ring.sm { width: 92px; height: 92px; flex: none; }
+.score-ring.sm .num { font-size: 40px; }
+.report-stats { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted); min-width: 0; }
+.report-stats b { color: var(--fg); font-size: 17px; margin-right: 4px; }
+.focus { display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
+.focus li b { color: var(--ice); }
+.note a { color: var(--ice); }
+
 @media (min-width: 700px) {
   .screen { padding-top: 28px; }
 }
