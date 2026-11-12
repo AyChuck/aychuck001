@@ -7,7 +7,7 @@ import { riffOfDay } from '../js/coach/riffs.js';
 import { makeFrames, singPlan } from './helpers.js';
 
 const profile = { low: 45, high: 64, refDb: -20 };
-const five = stepById('tono-2:1');
+const five = stepById('tono-2:cinco-notas-menores');
 
 test('todos los ejercicios generan un plan válido dentro del rango', () => {
   for (const prof of [profile, { low: 52, high: 76 }, { low: 40, high: 52 }]) {
@@ -42,9 +42,9 @@ test('cada grado exige más: margen más fino, más rápido, más largo', () => 
   assert.ok(g4.tol < g0.tol);
   assert.ok(g4.bpm > g0.bpm);
   assert.ok(g4.segs.length >= g0.segs.length);
-  assert.ok(buildPlan(stepById('aire-1:3'), profile, { grade: 5 }).target >= 24);
-  const h0 = buildPlan(stepById('scream-1:2'), profile, { grade: 0 });
-  const h5 = buildPlan(stepById('scream-1:2'), profile, { grade: 5 });
+  assert.ok(buildPlan(stepById('aire-1:hilo-de-aire'), profile, { grade: 5 }).target >= 24);
+  const h0 = buildPlan(stepById('scream-1:sosten-el-scream'), profile, { grade: 0 });
+  const h5 = buildPlan(stepById('scream-1:sosten-el-scream'), profile, { grade: 5 });
   assert.ok(h5.dur > h0.dur);
   // Lo que canta bien en grado 0 con 45 cents de error ya no alcanza en grado 5
   const e0 = scoreTake(g0, singPlan(g0, () => -45)).score;
@@ -96,7 +96,7 @@ test('la latencia del micrófono no castiga', () => {
 });
 
 test('nota temblorosa → "unstable"; caída al final → "dropEnd"; arrastre → "scoop"', () => {
-  const sustain = stepById('tono-1:2');
+  const sustain = stepById('tono-1:sosten-4-segundos');
   const plan = buildPlan(sustain, profile, {});
   let k = 0;
   const wob = scoreTake(plan, singPlan(plan, () => ((k++ * 37) % 160) - 80));
@@ -115,7 +115,7 @@ test('fallar solo las notas altas → "highMiss"', () => {
 });
 
 test('vibrato: detecta ~5.5 Hz y distingue una nota recta', () => {
-  const plan = buildPlan(stepById('vibrato-1:1'), profile, {});
+  const plan = buildPlan(stepById('vibrato-1:nota-con-vibrato'), profile, {});
   const vib = scoreTake(plan, singPlan(plan, (t) => 45 * Math.sin(2 * Math.PI * 5.5 * t)));
   assert.ok(Math.abs(vib.stats.vibRate - 5.5) < 0.8, `rate ${vib.stats.vibRate}`);
   assert.ok(vib.score >= 85, `score ${vib.score}`);
@@ -125,7 +125,7 @@ test('vibrato: detecta ~5.5 Hz y distingue una nota recta', () => {
 });
 
 test('dinámica: suave pedido y cantado fuerte → "notSoft"', () => {
-  const plan = buildPlan(stepById('estilo-1:1'), profile, {});
+  const plan = buildPlan(stepById('estilo-1:verso-la-marea'), profile, {});
   const loud = singPlan(plan).map((f) => ({ ...f, db: -15 }));
   const soft = singPlan(plan).map((f) => ({ ...f, db: -28 }));
   assert.ok(scoreTake(plan, loud, { refDb: -20 }).diag.includes('notSoft'));
@@ -133,7 +133,7 @@ test('dinámica: suave pedido y cantado fuerte → "notSoft"', () => {
 });
 
 test('sirena: recorrido completo y continuo puntúa alto; quiebres se detectan', () => {
-  const plan = buildPlan(stepById('calor-1:1'), profile, {});
+  const plan = buildPlan(stepById('calor-1:trino-de-labios'), profile, {});
   const path = (t) => {
     const p = plan.paths.find((x) => t >= x.t0 && t < x.t1);
     if (!p) return null;
@@ -158,7 +158,7 @@ test('sirena: recorrido completo y continuo puntúa alto; quiebres se detectan',
 });
 
 test('aire: duración y estabilidad', () => {
-  const plan = buildPlan(stepById('aire-1:3'), profile, {});
+  const plan = buildPlan(stepById('aire-1:hilo-de-aire'), profile, {});
   const full = scoreTake(plan, makeFrames(plan.dur, (t) => (t > 3.2 && t < 3.2 + 13 ? { kind: 'hiss', db: -30 } : null)));
   assert.ok(full.score >= 95, `score ${full.score}`);
   assert.ok(full.stats.longest >= 12.5);
@@ -168,7 +168,7 @@ test('aire: duración y estabilidad', () => {
 });
 
 test('guturales: distorsión en las ventanas, limpio se marca, volumen excesivo se marca', () => {
-  const plan = buildPlan(stepById('scream-1:2'), profile, {});
+  const plan = buildPlan(stepById('scream-1:sosten-el-scream'), profile, {});
   const inHarsh = (t) => plan.windows.some((w) => w.expect === 'harsh' && t >= w.t0 && t < w.t1);
   const good = scoreTake(plan, makeFrames(plan.dur, (t) => (inHarsh(t) ? { kind: 'harsh', db: -18 } : null)), { refDb: -20 });
   assert.ok(good.score >= 95, `score ${good.score}`);
@@ -181,7 +181,7 @@ test('guturales: distorsión en las ventanas, limpio se marca, volumen excesivo 
 });
 
 test('colores del scream: el orden grave < medio < agudo se evalúa por centroide', () => {
-  const plan = buildPlan(stepById('scream-2:1'), profile, {});
+  const plan = buildPlan(stepById('scream-2:tres-colores'), profile, {});
   const hs = plan.windows.filter((w) => w.expect === 'harsh');
   const frames = (cents) => makeFrames(plan.dur, (t) => {
     const i = hs.findIndex((w) => t >= w.t0 && t < w.t1);
@@ -193,7 +193,7 @@ test('colores del scream: el orden grave < medio < agudo se evalúa por centroid
 });
 
 test('transición limpio/scream', () => {
-  const plan = buildPlan(stepById('trans-1:1'), profile, {});
+  const plan = buildPlan(stepById('trans-1:ida-y-vuelta'), profile, {});
   const frames = makeFrames(plan.dur, (t) => {
     const w = plan.windows.find((x) => t >= x.t0 && t < x.t1);
     if (!w || w.expect === 'rest') return null;
@@ -205,7 +205,7 @@ test('transición limpio/scream', () => {
 });
 
 test('ritmo: golpes a tiempo, con retraso constante, y desordenados', () => {
-  const plan = buildPlan(stepById('ritmo-1:1'), profile, {});
+  const plan = buildPlan(stepById('ritmo-1:golpes-a-tiempo'), profile, {});
   const hits = plan.hits.filter((h) => h.seg === 'sing');
   const tap = (offs) => makeFrames(plan.dur, (t) => {
     const i = hits.findIndex((h, k) => t >= h.t + offs(k) && t < h.t + offs(k) + 0.12);
@@ -222,7 +222,7 @@ test('ritmo: golpes a tiempo, con retraso constante, y desordenados', () => {
 });
 
 test('registros: misma nota con voz llena y ligera; si suenan igual, lo detecta', () => {
-  const step = stepById('registro-cambio:3');
+  const step = stepById('registro-cambio:interruptor');
   const plan = buildPlan(step, profile, {});
   assert.equal(plan.reg, true);
   const sing = plan.notes.filter((n) => n.seg === 'sing');
@@ -246,7 +246,7 @@ test('registros: misma nota con voz llena y ligera; si suenan igual, lo detecta'
 });
 
 test('mezcla: debe quedar entre tu voz llena y tu voz ligera', () => {
-  const plan = buildPlan(stepById('registro-2:5'), profile, {});
+  const plan = buildPlan(stepById('registro-2:tres-voces-una-nota'), profile, {});
   const sing = plan.notes.filter((n) => n.seg === 'sing');
   assert.ok(sing.some((n) => n.reg === 'mix'));
   const take = (mix) => singPlan(plan).map((f) => {
@@ -262,7 +262,7 @@ test('mezcla: debe quedar entre tu voz llena y tu voz ligera', () => {
 });
 
 test('cruce sin escalón: un cambio brusco de peso se marca', () => {
-  const plan = buildPlan(stepById('registro-3:3'), profile, {});
+  const plan = buildPlan(stepById('registro-3:sirena-sin-escalon'), profile, {});
   assert.equal(plan.connect, true);
   const path = (t) => {
     const p = plan.paths.find((x) => t >= x.t0 && t < x.t1);

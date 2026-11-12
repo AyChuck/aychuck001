@@ -108,7 +108,7 @@ La app se adapta sola al nivel de cada micrófono: sigue el ruido de fondo del l
 
 ## Dónde se guarda tu progreso
 
-En el almacenamiento del navegador de ese dispositivo. Sobrevive a apagar y reiniciar. No se sube a ningún servidor, así que nadie más puede verlo. Se pierde si borras los datos del navegador, y cada navegador (y la app instalada en la pantalla de inicio) tiene su propia copia. En **Ajustes → Tus datos** puedes crear un respaldo y restaurarlo en otro dispositivo.
+En el almacenamiento del navegador de ese dispositivo. Sobrevive a apagar y reiniciar, y **las actualizaciones de la app no lo borran**: el código y tus datos viven por separado. Cada ejercicio se guarda bajo un nombre fijo (no por su posición en la lección), así que se pueden agregar o mover ejercicios sin afectar lo que ya tienes, y los datos de versiones anteriores se convierten solos al abrir la app. Hay pruebas automáticas que fallan si un cambio dejara huérfano algún progreso guardado. No se sube a ningún servidor, así que nadie más puede verlo. Se pierde si borras los datos del navegador, y cada navegador (y la app instalada en la pantalla de inicio) tiene su propia copia. En **Ajustes → Tus datos** puedes crear un respaldo y restaurarlo en otro dispositivo.
 
 ## Lo que la app no puede hacer
 

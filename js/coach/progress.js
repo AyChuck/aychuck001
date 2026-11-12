@@ -8,6 +8,7 @@
 //  - Hay un tope de lecciones NUEVAS por día, y cada etapa pide consolidar la anterior.
 
 import { LESSONS, STAGES, GYM, stepById, isScored, isHarsh } from '../content/curriculum.js';
+import { LEGACY_IDS } from '../content/legacy-ids.js';
 import { starsFor } from './scoring.js';
 
 export const SKILLS = {
@@ -35,7 +36,7 @@ export const HARSH_BUDGET = 240; // segundos de guturales por día
 
 export function defaultState() {
   return {
-    v: 2,
+    v: 3,
     onboarded: false,
     profile: { goal: 'both', exp: 'new', low: 45, high: 64, firstLow: null, firstHigh: null, refDb: null, gate: 0.012, tested: false },
     settings: { headphones: false, guide: true, strict: 1, sfx: true, grit: 1, room: false, roomGate: null, micVoice: false, lastBackup: null },
@@ -55,6 +56,35 @@ export function defaultState() {
     taste: ['posthc', 'punk', 'metal', 'core', 'es'],
     heroes: ['Sleep Token', 'Falling in Reverse', 'Bad Omens'], // referentes de técnica
   };
+}
+
+/**
+ * Convierte el progreso guardado con versiones anteriores de la app al formato actual,
+ * sin perder nada. Se ejecuta cada vez que la app carga datos guardados o un respaldo.
+ * Es segura de repetir.
+ */
+export function migrate(saved) {
+  const base = defaultState();
+  const s = {
+    ...base,
+    ...saved,
+    profile: { ...base.profile, ...saved.profile },
+    settings: { ...base.settings, ...saved.settings },
+    records: { ...base.records, ...saved.records },
+  };
+  if ((saved.v ?? 1) < 3) {
+    // v3: los ejercicios dejaron de identificarse por su posición en la lección
+    const ex = {};
+    for (const [id, rec] of Object.entries(s.ex ?? {})) {
+      const next = LEGACY_IDS[id] ?? id;
+      // Si por alguna razón existen los dos, se queda el más avanzado
+      ex[next] = ex[next] && (ex[next].plays ?? 0) >= (rec.plays ?? 0) ? ex[next] : rec;
+    }
+    s.ex = ex;
+    s.history = (s.history ?? []).map((h) => ({ ...h, id: LEGACY_IDS[h.id] ?? h.id }));
+  }
+  s.v = base.v;
+  return s;
 }
 
 export const dayKey = (ts = Date.now()) => {
@@ -219,7 +249,7 @@ export function canStart(state, lesson, now = Date.now()) {
 /** Ejercicios del gimnasio disponibles según la etapa alcanzada y el objetivo. */
 export function gymAvailable(state) {
   // El gimnasio empieza cuando ya conoces las escalas (lección "La escala del metalcore")
-  if (gradeOf(state.ex['tono-2:1']) < 1) return [];
+  if (gradeOf(state.ex['tono-2:cinco-notas-menores']) < 1) return [];
   return GYM.filter((g) => stageStatus(state, g.needs).unlocked && !(state.profile.goal === 'clean' && isHarsh(g)));
 }
 
@@ -352,8 +382,8 @@ const maxGrade = (s) => Math.max(0, ...Object.values(s.ex).map((r) => r.grade ??
 export const ACHIEVEMENTS = [
   { id: 'first', name: 'Primera toma', desc: 'Completa tu primer ejercicio', test: (s) => Object.keys(s.ex).length >= 1 },
   { id: 'tri', name: 'Clavado', desc: 'Saca 3 estrellas en un ejercicio', test: (s, c) => c.result?.stars === 3 },
-  { id: 'fry', name: 'Puerta vieja', desc: 'Logra tu primer vocal fry', test: (s) => gradeOf(s.ex['fry-1:2']) >= 1 },
-  { id: 'scream', name: 'Primer scream', desc: 'Sostén un fry scream', test: (s) => gradeOf(s.ex['scream-1:1']) >= 1 },
+  { id: 'fry', name: 'Puerta vieja', desc: 'Logra tu primer vocal fry', test: (s) => gradeOf(s.ex['fry-1:fry-bajito']) >= 1 },
+  { id: 'scream', name: 'Primer scream', desc: 'Sostén un fry scream', test: (s) => gradeOf(s.ex['scream-1:del-fry-al-scream']) >= 1 },
   { id: 'air20', name: 'Pulmones de acero', desc: 'Aguanta 20 s de aire parejo', test: (s) => (s.records?.air ?? 0) >= 20 },
   { id: 'g3', name: 'Sólido', desc: 'Lleva un ejercicio a grado 3', test: (s) => maxGrade(s) >= 3 },
   { id: 'g5', name: 'Dominado', desc: 'Lleva un ejercicio a grado 5', test: (s) => maxGrade(s) >= 5 },
@@ -362,7 +392,7 @@ export const ACHIEVEMENTS = [
   { id: 'days30', name: 'Un mes de voz', desc: 'Canta 30 días distintos', test: (s) => Object.keys(s.days).length >= 30 },
   { id: 'stage1', name: 'Fuera del cuarto', desc: 'Abre la etapa 2', test: (s) => stageStatus(s, 's2').unlocked },
   { id: 'mix', name: 'Coro arriba', desc: 'Termina "Coro que levanta"', test: (s) => lessonStatus(s, LESSONS.find((l) => l.id === 'estilo-2')).done },
-  { id: 'blegh', name: 'BLEGH', desc: 'Remata un breakdown', test: (s) => gradeOf(s.ex['blegh:1']) >= 1 },
+  { id: 'blegh', name: 'BLEGH', desc: 'Remata un breakdown', test: (s) => gradeOf(s.ex['blegh:blegh']) >= 1 },
   { id: 'range2', name: 'Más techo', desc: 'Amplía tu rango 2 semitonos', test: (s) => s.profile.firstHigh != null && s.profile.high - s.profile.low - (s.profile.firstHigh - s.profile.firstLow) >= 2 },
   { id: 'song1', name: 'Con la banda', desc: 'Graba una toma sobre una canción', test: (s) => Object.values(s.songs ?? {}).some((x) => x.takes?.length) },
   { id: 'songM', name: 'Repertorio', desc: 'Domina una canción', test: (s) => Object.values(s.songs ?? {}).some((x) => x.mastered) },

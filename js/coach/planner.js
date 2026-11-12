@@ -91,7 +91,7 @@ export function buildSession(state, mode = 'daily', now = Date.now()) {
   }
 
   // 5. Riff del día: una frase nueva cada día, cuando ya conoces la mecánica.
-  if (estimateMinutes(steps) < 8 && (state.ex['tono-2:1']?.plays ?? 0) > 0) add(stepById(RIFF_ID), 'riff');
+  if (estimateMinutes(steps) < 8 && (state.ex['tono-2:cinco-notas-menores']?.plays ?? 0) > 0) add(stepById(RIFF_ID), 'riff');
 
   // 6. Algo divertido que ya dominas (estilo, guturales o ritmo)
   if (estimateMinutes(steps) < 8) {

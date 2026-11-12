@@ -1,7 +1,7 @@
 // Estado global con guardado automático en este dispositivo (localStorage).
 
 import { useState, useEffect } from './lib.js';
-import { defaultState, record } from './coach/progress.js';
+import { defaultState, record, migrate } from './coach/progress.js';
 import { addSong, patchSong, removeSong, recordSongTake } from './coach/songs.js';
 import { stepById } from './content/curriculum.js';
 
@@ -11,15 +11,8 @@ function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultState();
-    const saved = JSON.parse(raw);
-    const base = defaultState();
-    return {
-      ...base,
-      ...saved,
-      profile: { ...base.profile, ...saved.profile },
-      settings: { ...base.settings, ...saved.settings },
-      records: { ...base.records, ...saved.records },
-    };
+    // Los datos guardados nunca se descartan: se convierten al formato actual
+    return migrate(JSON.parse(raw));
   } catch {
     return defaultState();
   }
@@ -105,8 +98,7 @@ export function exportData() {
 export function importData(text) {
   const data = JSON.parse(text);
   if (!data || typeof data !== 'object' || !data.profile) throw new Error('Archivo no válido');
-  const base = defaultState();
-  setState({ ...base, ...data, profile: { ...base.profile, ...data.profile }, settings: { ...base.settings, ...data.settings }, records: { ...base.records, ...data.records } });
+  setState(migrate(data));
 }
 
 export function resetAll() {

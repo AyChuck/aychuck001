@@ -384,11 +384,31 @@ const GYM_RAW = [
   { id: 'g-scream-largo', needs: 's4', kind: 'harsh', skill: 'harsh', title: 'Scream de 8 segundos', cue: 'Parejo, sin subir el volumen al final.', windows: [['harsh', 8, 'Sostén'], ['rest', 4], ['harsh', 8, 'Otra vez']] },
 ];
 
-// Asigna ids estables a cada paso: "leccion:indice"
-export const LESSONS = RAW.map((l) => ({
-  ...l,
-  steps: l.steps.map((s, i) => ({ ...s, id: `${l.id}:${i}`, lesson: l.id })),
-}));
+// Cada paso tiene un id ESTABLE, que es la llave con la que se guarda el progreso de la
+// persona: "leccion:nombre-del-paso". No depende del orden, así que se pueden insertar,
+// mover o agregar pasos sin tocar el progreso guardado.
+// Si algún día cambias el título de un paso, ponle `key` con su nombre anterior para
+// conservar su id (hay una prueba que avisa si un id guardado desaparece).
+const slug = (t) =>
+  t
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+
+export const LESSONS = RAW.map((l) => {
+  const seen = new Set();
+  return {
+    ...l,
+    steps: l.steps.map((s) => {
+      const key = s.key ?? `${s.kind === 'card' ? 'c-' : ''}${slug(s.title)}`;
+      if (seen.has(key)) throw new Error(`Paso repetido en ${l.id}: ${key}`);
+      seen.add(key);
+      return { ...s, id: `${l.id}:${key}`, lesson: l.id };
+    }),
+  };
+});
 
 export const WARMUPS = POOL.warmups.map((s) => ({ ...s, nograde: true }));
 export const COOLDOWNS = POOL.cooldowns.map((s) => ({ ...s, nograde: true }));
