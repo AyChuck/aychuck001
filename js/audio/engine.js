@@ -12,6 +12,7 @@ let stream = null;
 let source = null;
 let analyser = null;
 let buf = null;
+let bytes = null;
 let yin = null;
 let analyze = null;
 let raf = 0;
@@ -109,7 +110,13 @@ export function onFrame(fn) {
 function loop() {
   raf = requestAnimationFrame(loop);
   if (!analyser || ctx.state !== 'running') return;
-  analyser.getFloatTimeDomainData(buf);
+  if (analyser.getFloatTimeDomainData) analyser.getFloatTimeDomainData(buf);
+  else {
+    // Navegadores viejos solo entregan la onda en bytes
+    bytes ??= new Uint8Array(SIZE);
+    analyser.getByteTimeDomainData(bytes);
+    for (let i = 0; i < SIZE; i++) buf[i] = (bytes[i] - 128) / 128;
+  }
   const f = analyze(buf);
   const p = yin(buf);
   f.t = ctx.currentTime;
